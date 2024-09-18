@@ -58,11 +58,16 @@
 const uint8_t etsi_lipsdomainid[8] = {
         0x00, 0x04, 0x00, 0x02, 0x02, 0x05, 0x01, 0x11};
 
-uint8_t etsi_ipccoid[4] = {0x05, 0x03, 0x0a, 0x02};
-uint8_t etsi_ipirioid[4] = {0x05, 0x03, 0x0a, 0x01};
-uint8_t etsi_ipmmccoid[4] = {0x05, 0x05, 0x06, 0x02};
-uint8_t etsi_ipmmirioid[4] = {0x05, 0x05, 0x06, 0x01};
-uint8_t etsi_umtsirioid[9] = {0x00, 0x04, 0x00, 0x02, 0x02, 0x04, 0x01, 0x0f, 0x05};
+const uint8_t wandder_etsi_ipccoid[4] = {0x05, 0x03, 0x0a, 0x02};
+const uint8_t wandder_etsi_ipirioid[4] = {0x05, 0x03, 0x0a, 0x01};
+const uint8_t wandder_etsi_ipmmccoid[4] = {0x05, 0x05, 0x06, 0x02};
+const uint8_t wandder_etsi_ipmmirioid[4] = {0x05, 0x05, 0x06, 0x01};
+const uint8_t wandder_etsi_umtsirioid[9] =
+        {0x00, 0x04, 0x00, 0x02, 0x02, 0x04, 0x01, 0x0f, 0x05};
+const uint8_t wandder_etsi_epsirioid[9] =
+        {0x00, 0x04, 0x00, 0x02, 0x02, 0x04, 0x08, 0x11, 0x00};
+const uint8_t wandder_etsi_epsccoid[9] =
+        {0x00, 0x04, 0x00, 0x02, 0x02, 0x04, 0x09, 0x11, 0x00};
 
 static void init_dumpers(wandder_etsispec_t *dec);
 static void free_dumpers(wandder_etsispec_t *dec);
@@ -87,6 +92,16 @@ static char *stringify_ecgi(wandder_etsispec_t *etsidec,
 static char *stringify_sai(wandder_etsispec_t *etsidec,
         wandder_item_t *item, wandder_dumper_t *curr, char *valstr, int len);
 static char *stringify_uli(wandder_etsispec_t *etsidec,
+        wandder_item_t *item, wandder_dumper_t *curr, char *valstr, int len);
+static char *stringify_eps_attach_type(wandder_etsispec_t *etsidec,
+        wandder_item_t *item, wandder_dumper_t *curr, char *valstr, int len);
+static char *stringify_eps_rat_type(wandder_etsispec_t *etsidec,
+        wandder_item_t *item, wandder_dumper_t *curr, char *valstr, int len);
+static char *stringify_eps_cause(wandder_etsispec_t *etsidec,
+        wandder_item_t *item, wandder_dumper_t *curr, char *valstr, int len);
+static char *stringify_eps_pdntype(wandder_etsispec_t *etsidec,
+        wandder_item_t *item, wandder_dumper_t *curr, char *valstr, int len);
+static char *stringify_eps_ambr(wandder_etsispec_t *etsidec,
         wandder_item_t *item, wandder_dumper_t *curr, char *valstr, int len);
 static char *decrypt_encrypted_payload_item(wandder_etsispec_t *etsidec,
         wandder_item_t *item, char *valstr, int len);
@@ -697,6 +712,56 @@ static char *decode_field_to_str(wandder_etsispec_t *etsidec,
                 }
             }
             else if (curr->members[ident].interpretas ==
+                    WANDDER_TAG_EPS_APN_AMBR) {
+                if (stringify_eps_ambr(etsidec, dec->current, curr,
+                            valstr, 16384) == NULL) {
+                    fprintf(stderr,
+                            "Failed to interpret EPS APN-AMBR field: %d:%d\n",
+                            stack->current, ident);
+                    return NULL;
+                }
+            }
+            else if (curr->members[ident].interpretas ==
+                    WANDDER_TAG_EPS_CAUSE) {
+                if (stringify_eps_cause(etsidec, dec->current, curr,
+                            valstr, 16384) == NULL) {
+                    fprintf(stderr,
+                            "Failed to interpret EPS Cause field: %d:%d\n",
+                            stack->current, ident);
+                    return NULL;
+                }
+            }
+            else if (curr->members[ident].interpretas ==
+                    WANDDER_TAG_EPS_PDN_TYPE) {
+                if (stringify_eps_pdntype(etsidec, dec->current, curr,
+                            valstr, 16384) == NULL) {
+                    fprintf(stderr,
+                            "Failed to interpret EPS PDN Type field: %d:%d\n",
+                            stack->current, ident);
+                    return NULL;
+                }
+            }
+            else if (curr->members[ident].interpretas ==
+                    WANDDER_TAG_EPS_ATTACH_TYPE) {
+                if (stringify_eps_attach_type(etsidec, dec->current, curr,
+                            valstr, 16384) == NULL) {
+                    fprintf(stderr,
+                            "Failed to interpret EPS Attach Type field: %d:%d\n",
+                            stack->current, ident);
+                    return NULL;
+                }
+            }
+            else if (curr->members[ident].interpretas ==
+                    WANDDER_TAG_EPS_RAT_TYPE) {
+                if (stringify_eps_rat_type(etsidec, dec->current, curr,
+                            valstr, 16384) == NULL) {
+                    fprintf(stderr,
+                            "Failed to interpret EPS RAT Type field: %d:%d\n",
+                            stack->current, ident);
+                    return NULL;
+                }
+            }
+            else if (curr->members[ident].interpretas ==
                     WANDDER_TAG_ENCRYPTED) {
                 assert(etsidec->decrypted == NULL);
                 if (decrypt_encrypted_payload_item(etsidec,
@@ -841,7 +906,7 @@ static uint8_t *internal_get_cc_contents(wandder_etsispec_t *etsidec,
     uint8_t *vp = NULL;
     int tgtcount;
     wandder_found_t *found = NULL;
-    wandder_target_t cctgts[5];
+    wandder_target_t cctgts[6];
     wandder_dumper_t *startpoint;
 
     if (etsidec->decstate == 0) {
@@ -851,7 +916,7 @@ static uint8_t *internal_get_cc_contents(wandder_etsispec_t *etsidec,
     }
     etsidec->ccformat = WANDDER_ETSILI_CC_FORMAT_UNKNOWN;
 
-    /* Find IPCCContents or IPMMCCContents or UMTSCC or emailCC */
+    /* Find IPCCContents or IPMMCCContents or UMTSCC or emailCC or epsCC */
     cctgts[0].parent = &etsidec->ipcccontents;
     cctgts[0].itemid = 0;
     cctgts[0].found = false;
@@ -868,18 +933,22 @@ static uint8_t *internal_get_cc_contents(wandder_etsispec_t *etsidec,
     cctgts[3].itemid = 2;
     cctgts[3].found = false;
 
+    cctgts[4].parent = &etsidec->epscc;
+    cctgts[4].itemid = 2;
+    cctgts[4].found = false;
+
     if (dec == etsidec->dec) {
         /* Also look for encrypted payload */
-        tgtcount = 5;
-        cctgts[4].parent = &etsidec->payload;
-        cctgts[4].itemid = 4;
-        cctgts[4].found = false;
+        tgtcount = 6;
+        cctgts[5].parent = &etsidec->payload;
+        cctgts[5].itemid = 4;
+        cctgts[5].found = false;
         startpoint = &(etsidec->root);
     } else if (dec == etsidec->decrypt_dec) {
-        tgtcount = 4;
+        tgtcount = 5;
         startpoint = &(etsidec->encryptedpayloadroot);
     } else {
-        tgtcount = 4;
+        tgtcount = 5;
         startpoint = &(etsidec->root);
     }
 
@@ -903,6 +972,9 @@ static uint8_t *internal_get_cc_contents(wandder_etsispec_t *etsidec,
             strncpy(name, etsidec->emailcc.members[2].name, namelen);
             wandder_etsili_get_email_format(etsidec, dec, startpoint);
         } else if (found->list[0].targetid == 4) {
+            strncpy(name, etsidec->epscc.members[2].name, namelen);
+            etsidec->ccformat = WANDDER_ETSILI_CC_FORMAT_IP;
+        } else if (found->list[0].targetid == 5) {
             if (decrypt_encryption_container(etsidec, found->list[0].item)) {
                 return internal_get_cc_contents(etsidec, etsidec->decrypt_dec,
                         len, name, namelen);
@@ -1239,6 +1311,102 @@ static char *stringify_3gcause(wandder_etsispec_t *etsidec,
             strncpy(valstr, "Unknown", len);
             break;
     }
+    return valstr;
+}
+
+static char *stringify_eps_pdntype(wandder_etsispec_t *etsidec,
+        wandder_item_t *item, wandder_dumper_t *curr, char *valstr, int len) {
+
+    uint8_t *ptr = (uint8_t *)item->valptr;
+
+    switch(*ptr) {
+        case 1:
+            strncpy(valstr, "IPv4", len);
+            break;
+        case 2:
+            strncpy(valstr, "IPv6", len);
+            break;
+        case 3:
+            strncpy(valstr, "IPv4v6", len);
+            break;
+        case 4:
+            strncpy(valstr, "Non-IP", len);
+            break;
+        case 5:
+            strncpy(valstr, "Ethernet", len);
+            break;
+
+        default:
+            snprintf(valstr, len, "%u", *ptr);
+            break;
+    }
+    return valstr;
+}
+
+static char *stringify_eps_cause(wandder_etsispec_t *etsidec,
+        wandder_item_t *item, wandder_dumper_t *curr, char *valstr, int len) {
+
+    uint8_t *ptr = (uint8_t *)item->valptr;
+
+    switch(*ptr) {
+        case 13:
+            strncpy(valstr, "Network Failure", len);
+            break;
+        case 16:
+            strncpy(valstr, "Request Accepted", len);
+            break;
+        case 64:
+            strncpy(valstr, "Context Not Found", len);
+            break;
+        case 65:
+            strncpy(valstr, "Invalid Message Format", len);
+            break;
+        case 67:
+            strncpy(valstr, "Invalid Length", len);
+            break;
+        case 66:
+            strncpy(valstr, "Version not supported by next peer", len);
+            break;
+        case 72:
+            strncpy(valstr, "System Failure", len);
+            break;
+        case 68:
+            strncpy(valstr, "Service not supported", len);
+            break;
+        case 69:
+            strncpy(valstr, "Mandatory IE incorrect", len);
+            break;
+        case 70:
+            strncpy(valstr, "Mandatory IE missing", len);
+            break;
+        case 94:
+            strncpy(valstr, "Request rejected (reason not specified)", len);
+            break;
+        case 110:
+            strncpy(valstr, "Temporarily rejected due to handover procedure in progress", len);
+            break;
+        default:
+            snprintf(valstr, len, "%u", *ptr);
+            break;
+    }
+    return valstr;
+}
+
+static char *stringify_eps_ambr(wandder_etsispec_t *etsidec,
+        wandder_item_t *item, wandder_dumper_t *curr, char *valstr, int len) {
+
+    uint32_t *uplink, *downlink;
+
+    if (item->length < 8) {
+        strncpy(valstr, "INVALID", len);
+        return valstr;
+    }
+
+    uplink = (uint32_t *)item->valptr;
+    downlink = uplink + 1;
+
+    snprintf(valstr, len, "Uplink=%u  Downlink=%u", ntohl(*uplink),
+            ntohl(*downlink));
     return valstr;
 }
 
@@ -1625,6 +1793,97 @@ static char *stringify_sequenced_primitives(char *sequence_name,
 
     return space;
 
+}
+
+static char *stringify_eps_rat_type(wandder_etsispec_t *etsidec,
+        wandder_item_t *item, wandder_dumper_t *curr, char *valstr, int len) {
+
+    uint8_t *ptr = item->valptr;
+
+    if (len <= 0 || valstr == NULL) {
+        return NULL;
+    }
+    memset(valstr, 0, len);
+
+    if (item->length < 1) {
+        return NULL;
+    }
+
+    switch(*ptr) {
+        case 1:
+            strncpy(valstr, "UTRAN", len);
+            break;
+        case 2:
+            strncpy(valstr, "GERAN", len);
+            break;
+        case 3:
+            strncpy(valstr, "WLAN", len);
+            break;
+        case 4:
+            strncpy(valstr, "GAN", len);
+            break;
+        case 5:
+            strncpy(valstr, "HSPA Evolution", len);
+            break;
+        case 6:
+            strncpy(valstr, "EUTRAN", len);
+            break;
+        case 7:
+            strncpy(valstr, "Virtual", len);
+            break;
+        case 8:
+            strncpy(valstr, "EUTRAN-NB-IoT", len);
+            break;
+        case 9:
+            strncpy(valstr, "LTE-M", len);
+            break;
+        case 10:
+            strncpy(valstr, "NR", len);
+            break;
+        default:
+            snprintf(valstr, len, "Unknown RAT Type: %u\n", *ptr);
+            break;
+    }
+
+    return valstr;
+}
+
+
+static char *stringify_eps_attach_type(wandder_etsispec_t *etsidec,
+        wandder_item_t *item, wandder_dumper_t *curr, char *valstr, int len) {
+
+    uint8_t *ptr = item->valptr;
+    uint8_t epsval = (*ptr) & 0x07;
+
+    if (len <= 0 || valstr == NULL) {
+        return NULL;
+    }
+    memset(valstr, 0, len);
+
+    if (item->length != 1) {
+        return NULL;
+    }
+    switch(epsval) {
+        case 1:
+            strncpy(valstr, "EPS Attach", len);
+            break;
+        case 2:
+            strncpy(valstr, "Combined EPS/IMSI Attach", len);
+            break;
+        case 3:
+            strncpy(valstr, "EPS RLOS Attach", len);
+            break;
+        case 6:
+            strncpy(valstr, "EPS Emergency Attach", len);
+            break;
+        case 7:
+            strncpy(valstr, "(reserved)", len);
+            break;
+        default:
+            strncpy(valstr, "EPS Attach (defaulted)", len);
+    }
+
+    return valstr;
 }
 
 static char *stringify_uli(wandder_etsispec_t *etsidec,
@@ -2311,7 +2570,8 @@ static char *interpret_enum(wandder_etsispec_t *etsidec, wandder_item_t *item,
         }
     }
 
-    else if (item->identifier == 4 && curr == &(etsidec->umtsiri_params)) {
+    else if (item->identifier == 4 && (curr == &(etsidec->umtsiri_params) ||
+                curr == &(etsidec->epsiri_params))) {
         /* initiator for uMTSIRI */
         switch(enumval) {
             case 0:
@@ -2605,8 +2865,258 @@ static char *interpret_enum(wandder_etsispec_t *etsidec, wandder_item_t *item,
                 name = "part1";
                 break;
         }
-    }
+    } else if (item->identifier == 20 && curr == &(etsidec->epsiri_params)) {
+        /* ePSEvent */
+        switch(enumval) {
+            case 1:
+                name = "pDPContextActivation";
+                break;
+            case 2:
+                name = "startOfInterceptionWithPDPContextActive";
+                break;
+            case 4:
+                name = "pDPContextDeactivation";
+                break;
+            case 5:
+                name = "gPRSAttach";
+                break;
+            case 6:
+                name = "gPRSDetach";
+                break;
+            case 10:
+                name = "locationInfoUpdate";
+                break;
+            case 11:
+                name = "sMS";
+                break;
+            case 13:
+                name = "pDPContextModification";
+                break;
+            case 14:
+                name = "servingSystem";
+                break;
+            case 15:
+                name = "startofInterceptionWithMSAttached";
+                break;
+            case 16:
+                name = "e-UTRANAttach";
+                break;
+            case 17:
+                name = "e-UTRANDetach";
+                break;
+            case 18:
+                name = "bearerActivation";
+                break;
+            case 19:
+                name = "startOfInterceptionWithActiveBearer";
+                break;
+            case 20:
+                name = "bearerModification";
+                break;
+            case 21:
+                name = "bearerDeactivation";
+                break;
+            case 22:
+                name = "uERequestedBearerResourceModification";
+                break;
+            case 23:
+                name = "uERequestedPDNConnectivity";
+                break;
+            case 24:
+                name = "uERequestedPDNDisconnection";
+                break;
+            case 25:
+                name = "trackingAreaEpsLocationUpdate";
+                break;
+            case 26:
+                name = "servingEvolvedPacketSystem";
+                break;
+            case 27:
+                name = "pMIPAttachTunnelActivation";
+                break;
+            case 28:
+                name = "pMIPDetachTunnelDeactivation";
+                break;
+            case 29:
+                name = "startOfInterceptionWithActivePMIPTunnel";
+                break;
+            case 30:
+                name = "pMIPPdnGwInitiatedPdnDisconnection";
+                break;
+            case 31:
+                name = "mIPRegistrationTunnelActivation";
+                break;
+            case 32:
+                name = "mIPDeregistrationTunnelDeactivation";
+                break;
+            case 33:
+                name = "startOfInterceptionWithActiveMIPTunnel";
+                break;
+            case 34:
+                name = "dSMIPRegistrationTunnelActivation";
+                break;
+            case 35:
+                name = "dSMIPDeregistrationTunnelDeactivation";
+                break;
+            case 36:
+                name = "startOfInterceptionWithActiveDsmipTunnel";
+                break;
+            case 37:
+                name = "dSMipHaSwitch";
+                break;
+            case 38:
+                name = "pMIPResourceAllocationDeactivation";
+                break;
+            case 39:
+                name = "mIPResourceAllocationDeactivation";
+                break;
+            case 40:
+                name = "pMIPsessionModification";
+                break;
+            case 41:
+                name = "startOfInterceptionWithEUTRANAttachedUE";
+                break;
+            case 42:
+                name = "dSMIPSessionModification";
+                break;
+            case 43:
+                name = "packetDataHeaderInformation";
+                break;
+            case 44:
+                name = "hSS-Subscriber-Record-Change";
+                break;
+            case 45:
+                name = "registration-Termination";
+                break;
+            case 46:
+                name = "location-Up-Date";
+                break;
+            case 47:
+                name = "cancel-Location";
+                break;
+            case 48:
+                name = "register-Location";
+                break;
+            case 49:
+                name = "location-Information-Request";
+                break;
+            case 50:
+                name = "proSeRemoteUEReport";
+                break;
+            case 51:
+                name = "proSeRemoteUEStartOfCommunication";
+                break;
+            case 52:
+                name = "proSeRemoteUEEndOfCommunication";
+                break;
+            case 53:
+                name = "startOfLIwithProSeRemoteUEOngoingComm";
+                break;
+            case 54:
+                name = "startOfLIforProSeUEtoNWRelay";
+                break;
+            case 55:
+                name = "scefRequestednonIPPDNDisconnection";
+                break;
 
+        }
+    } else if (item->identifier == 29 && curr == &(etsidec->epsiri_params)) {
+        /* iMSEvent */
+        switch(enumval) {
+            case 1:
+                name = "unfilteredSIPmessage";
+                break;
+            case 2:
+                name = "sIPheaderOnly";
+                break;
+            case 3:
+                name = "decryptionKeysAvailable";
+                break;
+            case 4:
+                name = "startOfInterceptionForIMSEstablishedSession";
+                break;
+            case 5:
+                name = "xCAPRequest";
+                break;
+            case 6:
+                name = "xCAPResponse";
+                break;
+            case 7:
+                name = "ccUnavailable";
+                break;
+            case 8:
+                name = "sMSOverIMS";
+                break;
+            case 9:
+                name = "servingSystem";
+                break;
+            case 10:
+                name = "subscriberRecordChange";
+                break;
+            case 11:
+                name = "registrationTermination";
+                break;
+            case 12:
+                name = "locationInformationRequest";
+                break;
+        }
+    } else if (item->identifier == 34 && curr == &(etsidec->epsiri_params)) {
+        /* ldiEvent */
+        switch(enumval) {
+            case 1:
+                name = "targetEntersIA";
+                break;
+            case 2:
+                name = "targetLeavesIA";
+                break;
+        }
+    } else if ((item->identifier == 10 || item->identifier == 21)
+            && curr == &(etsidec->eps_gtpv2_params)) {
+        /* typeOfBearer */
+        switch(enumval) {
+            case 1:
+                name = "defaultBearer";
+                break;
+            case 2:
+                name = "dedicatedBearer";
+                break;
+        }
+    } else if (item->identifier == 6 && curr == &(etsidec->ulic_header)) {
+        /* TPDU-direction */
+        switch(enumval) {
+            case 1:
+                name = "from-target";
+                break;
+            case 2:
+                name = "to-target";
+                break;
+            case 3:
+                name = "unknown";
+                break;
+        }
+    } else if (item->identifier == 8 && curr == &(etsidec->ulic_header)) {
+        /* ICE-type */
+        switch(enumval) {
+            case 1:
+                name = "sgsn";
+                break;
+            case 2:
+                name = "ggsn";
+                break;
+            case 3:
+                name = "s-GW";
+                break;
+            case 4:
+                name = "pDN-GW";
+                break;
+            case 5:
+                name = "colocated-SAE-GWs";
+                break;
+            case 6:
+                name = "ePDG";
+                break;
+        }
+    }
 
     if (name != NULL) {
         snprintf(valstr, len, "%s", name);
@@ -2634,6 +3144,8 @@ static void free_dumpers(wandder_etsispec_t *dec) {
     free(dec->ipcccontents.members);
     free(dec->ipmmcc.members);
     free(dec->ipcc.members);
+    free(dec->epscc.members);
+    free(dec->ulic_header.members);
     free(dec->netelid.members);
     free(dec->linetid.members);
     free(dec->networkidentifier.members);
@@ -2664,6 +3176,11 @@ static void free_dumpers(wandder_etsispec_t *dec) {
     free(dec->aaainformation.members);
     free(dec->pop3aaainformation.members);
     free(dec->asmtpaaainformation.members);
+    free(dec->epsiri.members);
+    free(dec->epsiri_params.members);
+    free(dec->umtsqos.members);
+    free(dec->eps_protconfigoptions.members);
+    free(dec->eps_gtpv2_params.members);
     free(dec->umtsiri.members);
     free(dec->umtsiri_params.members);
     free(dec->iricontents.members);
@@ -2677,6 +3194,8 @@ static void free_dumpers(wandder_etsispec_t *dec) {
 }
 
 static void init_dumpers(wandder_etsispec_t *dec) {
+
+    size_t i;
 
     dec->ipvalue.membercount = 3;
     ALLOC_MEMBERS(dec->ipvalue);
@@ -3056,6 +3575,71 @@ static void init_dumpers(wandder_etsispec_t *dec) {
         };
     dec->ipcc.sequence = WANDDER_NOACTION;
 
+    dec->epscc.membercount = 3;
+    ALLOC_MEMBERS(dec->epscc);
+    dec->epscc.members[0] = WANDDER_NOACTION;
+    dec->epscc.members[1] =
+        (struct wandder_dump_action) {
+                .name = "uLIC-header",
+                .descend = &dec->ulic_header,
+                .interpretas = WANDDER_TAG_NULL
+        };
+    dec->epscc.members[2] =
+        (struct wandder_dump_action) {
+                .name = "payload",
+                .descend = NULL,
+                .interpretas = WANDDER_TAG_IPPACKET
+        };
+
+    dec->ulic_header.membercount = 9;
+    ALLOC_MEMBERS(dec->ulic_header);
+
+    dec->ulic_header.members[0] =
+        (struct wandder_dump_action) {
+                .name = "hi3DomainId",
+                .descend = NULL,
+                .interpretas = WANDDER_TAG_OID
+        };
+    dec->ulic_header.members[1] = WANDDER_NOACTION;
+    dec->ulic_header.members[2] =
+        (struct wandder_dump_action) {
+                .name = "lIID",
+                .descend = NULL,
+                .interpretas = WANDDER_TAG_OCTETSTRING
+        };
+    dec->ulic_header.members[3] =
+        (struct wandder_dump_action) {
+                .name = "correlation-Number",
+                .descend = NULL,
+                .interpretas = WANDDER_TAG_OCTETSTRING
+        };
+    dec->ulic_header.members[4] =
+        (struct wandder_dump_action) {
+                .name = "timeStamp",
+                .descend = &(dec->timestamp),
+                .interpretas = WANDDER_TAG_NULL
+        };
+    dec->ulic_header.members[5] =
+        (struct wandder_dump_action) {
+                .name = "sequence-number",
+                .descend = NULL,
+                .interpretas = WANDDER_TAG_INTEGER
+        };
+    dec->ulic_header.members[6] =
+        (struct wandder_dump_action) {
+                .name = "t-PDU-direction",
+                .descend = NULL,
+                .interpretas = WANDDER_TAG_ENUM
+        };
+    // TODO nationalHI3ASN1Parameters
+    dec->ulic_header.members[7] = WANDDER_NOACTION;
+    dec->ulic_header.members[8] =
+        (struct wandder_dump_action) {
+                .name = "ice-type",
+                .descend = NULL,
+                .interpretas = WANDDER_TAG_ENUM
+        };
+
     dec->ipmmcc.membercount = 5;
     ALLOC_MEMBERS(dec->ipmmcc);
 
@@ -3283,7 +3867,12 @@ static void init_dumpers(wandder_etsispec_t *dec) {
     dec->cccontents.members[14] = WANDDER_NOACTION;
     dec->cccontents.members[15] = WANDDER_NOACTION;
     dec->cccontents.members[16] = WANDDER_NOACTION;
-    dec->cccontents.members[17] = WANDDER_NOACTION;
+    dec->cccontents.members[17] =
+        (struct wandder_dump_action) {
+                .name = "ePSCC",
+                .descend = &dec->epscc,
+                .interpretas = WANDDER_TAG_NULL
+        };
     dec->cccontents.members[18] = WANDDER_NOACTION;
     dec->cccontents.sequence = WANDDER_NOACTION;
 
@@ -3803,6 +4392,330 @@ static void init_dumpers(wandder_etsispec_t *dec) {
                 .interpretas = WANDDER_TAG_NULL
         };
 
+    dec->umtsqos.membercount = 3;
+    ALLOC_MEMBERS(dec->umtsqos);
+    dec->umtsqos.sequence = WANDDER_NOACTION;
+
+    dec->umtsqos.members[0] = WANDDER_NOACTION;
+    dec->umtsqos.members[1] =
+        (struct wandder_dump_action) {
+                .name = "qosMobileRadio",
+                .descend = NULL,
+                .interpretas = WANDDER_TAG_OCTETSTRING
+        };
+    dec->umtsqos.members[2] =
+        (struct wandder_dump_action) {
+                .name = "qosGn",
+                .descend = NULL,
+                .interpretas = WANDDER_TAG_OCTETSTRING
+        };
+
+    dec->eps_protconfigoptions.membercount = 3;
+    ALLOC_MEMBERS(dec->eps_protconfigoptions);
+    dec->eps_protconfigoptions.sequence = WANDDER_NOACTION;
+
+    dec->eps_protconfigoptions.members[0] = WANDDER_NOACTION;
+    dec->eps_protconfigoptions.members[1] =
+        (struct wandder_dump_action) {
+                .name = "ueToNetwork",
+                .descend = NULL,
+                .interpretas = WANDDER_TAG_HEX_BYTES
+        };
+    dec->eps_protconfigoptions.members[2] =
+        (struct wandder_dump_action) {
+                .name = "networkToUe",
+                .descend = NULL,
+                .interpretas = WANDDER_TAG_HEX_BYTES
+        };
+
+    dec->eps_gtpv2_params.membercount = 36;
+    ALLOC_MEMBERS(dec->eps_gtpv2_params);
+    dec->eps_gtpv2_params.sequence = WANDDER_NOACTION;
+
+    for (i = 0; i < dec->eps_gtpv2_params.membercount; i++) {
+        dec->eps_gtpv2_params.members[i] = WANDDER_NOACTION;
+    }
+
+    dec->eps_gtpv2_params.members[1] =
+        (struct wandder_dump_action) {
+                .name = "pDNAddressAllocation",
+                .descend = NULL,
+                .interpretas = WANDDER_TAG_HEX_BYTES
+        };
+
+    dec->eps_gtpv2_params.members[2] =
+        (struct wandder_dump_action) {
+                .name = "aPN",
+                .descend = NULL,
+                .interpretas = WANDDER_TAG_DOMAIN_NAME
+        };
+
+    dec->eps_gtpv2_params.members[3] =
+        (struct wandder_dump_action) {
+                .name = "protConfigOptions",
+                .descend = &(dec->eps_protconfigoptions),
+                .interpretas = WANDDER_TAG_NULL
+        };
+
+    dec->eps_gtpv2_params.members[4] =
+        (struct wandder_dump_action) {
+                .name = "attachType",
+                .descend = NULL,
+                .interpretas = WANDDER_TAG_EPS_ATTACH_TYPE
+        };
+
+    dec->eps_gtpv2_params.members[5] =
+        (struct wandder_dump_action) {
+                .name = "ePSBearerIdentity",
+                .descend = NULL,
+                .interpretas = WANDDER_TAG_HEX_BYTES
+        };
+
+    dec->eps_gtpv2_params.members[6] =
+        (struct wandder_dump_action) {
+                .name = "detachType",
+                .descend = NULL,
+                .interpretas = WANDDER_TAG_HEX_BYTES
+        };
+
+    dec->eps_gtpv2_params.members[7] =
+        (struct wandder_dump_action) {
+                .name = "rATType",
+                .descend = NULL,
+                .interpretas = WANDDER_TAG_EPS_RAT_TYPE
+        };
+
+    dec->eps_gtpv2_params.members[8] =
+        (struct wandder_dump_action) {
+                .name = "failedBearerActivationReason",
+                .descend = NULL,
+                .interpretas = WANDDER_TAG_EPS_CAUSE
+        };
+
+    dec->eps_gtpv2_params.members[9] =
+        (struct wandder_dump_action) {
+                .name = "ePSBearerQoS",
+                .descend = NULL,
+                .interpretas = WANDDER_TAG_HEX_BYTES
+        };
+
+    dec->eps_gtpv2_params.members[10] =
+        (struct wandder_dump_action) {
+                .name = "bearerActivationType",
+                .descend = NULL,
+                .interpretas = WANDDER_TAG_ENUM
+        };
+
+    dec->eps_gtpv2_params.members[11] =
+        (struct wandder_dump_action) {
+                .name = "aPN-AMBR",
+                .descend = NULL,
+                .interpretas = WANDDER_TAG_EPS_APN_AMBR
+        };
+
+    dec->eps_gtpv2_params.members[13] =
+        (struct wandder_dump_action) {
+                .name = "linkedEPSBearerId",
+                .descend = NULL,
+                .interpretas = WANDDER_TAG_HEX_BYTES
+        };
+
+    dec->eps_gtpv2_params.members[16] =
+        (struct wandder_dump_action) {
+                .name = "failedBearerModificationReason",
+                .descend = NULL,
+                .interpretas = WANDDER_TAG_EPS_CAUSE
+        };
+
+    dec->eps_gtpv2_params.members[21] =
+        (struct wandder_dump_action) {
+                .name = "bearerDeactivationType",
+                .descend = NULL,
+                .interpretas = WANDDER_TAG_ENUM
+        };
+
+    dec->eps_gtpv2_params.members[22] =
+        (struct wandder_dump_action) {
+                .name = "bearerDeactivationCause",
+                .descend = NULL,
+                .interpretas = WANDDER_TAG_EPS_CAUSE
+        };
+
+    dec->eps_gtpv2_params.members[23] =
+        (struct wandder_dump_action) {
+                .name = "ePSlocationOfTheTarget",
+                .descend = &(dec->epslocation),
+                .interpretas = WANDDER_TAG_NULL
+        };
+
+    dec->eps_gtpv2_params.members[24] =
+        (struct wandder_dump_action) {
+                .name = "pDNType",
+                .descend = NULL,
+                .interpretas = WANDDER_TAG_EPS_PDN_TYPE
+        };
+
+
+    /* TODO eps_gtpv2_params.members */
+
+    /* Most of these are unused */
+    dec->epsiri_params.membercount = 256;
+    ALLOC_MEMBERS(dec->epsiri_params);
+    dec->epsiri_params.sequence = WANDDER_NOACTION;
+
+    for (i = 0; i < dec->epsiri_params.membercount; i++) {
+        dec->epsiri_params.members[i] = WANDDER_NOACTION;
+    }
+
+    dec->epsiri_params.members[0] =
+        (struct wandder_dump_action) {
+                .name = "hi2epsDomainId",
+                .descend = NULL,
+                .interpretas = WANDDER_TAG_OID
+        };
+
+    dec->epsiri_params.members[1] =
+        (struct wandder_dump_action) {
+                .name = "lawfulInterceptionIdentifier",
+                .descend = NULL,
+                .interpretas = WANDDER_TAG_OCTETSTRING
+        };
+
+    dec->epsiri_params.members[3] =
+        (struct wandder_dump_action) {
+                .name = "timeStamp",
+                .descend = &dec->timestamp,
+                .interpretas = WANDDER_TAG_NULL
+        };
+
+    dec->epsiri_params.members[4] =
+        (struct wandder_dump_action) {
+                .name = "initiator",
+                .descend = NULL,
+                .interpretas = WANDDER_TAG_ENUM
+        };
+
+    dec->epsiri_params.members[8] =
+        (struct wandder_dump_action) {
+                .name = "locationOfTheTarget",
+                .descend = &dec->location,
+                .interpretas = WANDDER_TAG_NULL
+        };
+
+    dec->epsiri_params.members[9] =
+        (struct wandder_dump_action) {
+                .name = "partyInformation",
+                .descend = &dec->partyinfo,
+                .interpretas = WANDDER_TAG_NULL
+        };
+
+    dec->epsiri_params.members[13] =
+        (struct wandder_dump_action) {
+                .name = "serviceCenterAddress",
+                .descend = &dec->partyinfo,
+                .interpretas = WANDDER_TAG_NULL
+        };
+
+    dec->epsiri_params.members[18] =
+        (struct wandder_dump_action) {
+                .name = "ePSCorrelationNumber",
+                .descend = NULL,
+                .interpretas = WANDDER_TAG_OCTETSTRING
+        };
+
+    dec->epsiri_params.members[20] =
+        (struct wandder_dump_action) {
+                .name = "ePSevent",
+                .descend = NULL,
+                .interpretas = WANDDER_TAG_ENUM
+        };
+
+    dec->epsiri_params.members[21] =
+        (struct wandder_dump_action) {
+                .name = "sgsnAddress",
+                .descend = &(dec->datanodeaddress),
+                .interpretas = WANDDER_TAG_NULL
+        };
+    dec->epsiri_params.members[22] =
+        (struct wandder_dump_action) {
+                .name = "gPRSOperationErrorCode",
+                .descend = NULL,
+                .interpretas = WANDDER_TAG_3G_SM_CAUSE
+        };
+    dec->epsiri_params.members[24] =
+        (struct wandder_dump_action) {
+                .name = "ggsnAddress",
+                .descend = &(dec->datanodeaddress),
+                .interpretas = WANDDER_TAG_NULL
+        };
+    dec->epsiri_params.members[25] =
+        (struct wandder_dump_action) {
+                .name = "qOS",
+                .descend = &(dec->umtsqos),
+                .interpretas = WANDDER_TAG_NULL
+        };
+    dec->epsiri_params.members[26] =
+        (struct wandder_dump_action) {
+                .name = "networkIdentifier",
+                .descend = &(dec->networkidentifier),
+                .interpretas = WANDDER_TAG_NULL
+        };
+    dec->epsiri_params.members[27] =
+        (struct wandder_dump_action) {
+                .name = "sMSOriginatingAddress",
+                .descend = &(dec->datanodeaddress),
+                .interpretas = WANDDER_TAG_NULL
+        };
+    dec->epsiri_params.members[28] =
+        (struct wandder_dump_action) {
+                .name = "sMSTerminatingAddress",
+                .descend = &(dec->datanodeaddress),
+                .interpretas = WANDDER_TAG_NULL
+        };
+    dec->epsiri_params.members[29] =
+        (struct wandder_dump_action) {
+                .name = "iMSevent",
+                .descend = NULL,
+                .interpretas = WANDDER_TAG_ENUM
+        };
+    dec->epsiri_params.members[30] =
+        (struct wandder_dump_action) {
+                .name = "sIPMessage",
+                .descend = NULL,
+                .interpretas = WANDDER_TAG_OCTETSTRING
+        };
+    dec->epsiri_params.members[31] =
+        (struct wandder_dump_action) {
+                .name = "servingSGSN-number",
+                .descend = NULL,
+                .interpretas = WANDDER_TAG_OCTETSTRING
+        };
+    dec->epsiri_params.members[32] =
+        (struct wandder_dump_action) {
+                .name = "servingSGSN-address",
+                .descend = NULL,
+                .interpretas = WANDDER_TAG_OCTETSTRING
+        };
+    dec->epsiri_params.members[34] =
+        (struct wandder_dump_action) {
+                .name = "ldiEvent",
+                .descend = NULL,
+                .interpretas = WANDDER_TAG_ENUM
+        };
+    dec->epsiri_params.members[35] = WANDDER_NOACTION;      // correlation
+    dec->epsiri_params.members[36] =
+        (struct wandder_dump_action) {
+                .name = "ePS-GTPV2-specificParameters",
+                .descend = &(dec->eps_gtpv2_params),
+                .interpretas = WANDDER_TAG_NULL
+        };
+
+    /* TODO the rest of these members -- OpenLI doesn't need them so
+     * can't justify spending too much time on them right now...
+     */
+
+
+
     dec->umtsiri_params.membercount = 60;
     ALLOC_MEMBERS(dec->umtsiri_params);
     dec->umtsiri_params.sequence = WANDDER_NOACTION;
@@ -4101,6 +5014,17 @@ static void init_dumpers(wandder_etsispec_t *dec) {
     dec->umtsiri.members[2] = WANDDER_NOACTION;
     dec->umtsiri.members[3] = WANDDER_NOACTION;
 
+    dec->epsiri.membercount = 2;
+    ALLOC_MEMBERS(dec->epsiri);
+    dec->epsiri.sequence = WANDDER_NOACTION;
+    dec->epsiri.members[0] =
+        (struct wandder_dump_action) {
+                .name = "iRI-EPS-Parameters",
+                .descend = &(dec->epsiri_params),
+                .interpretas = WANDDER_TAG_NULL
+        };
+    dec->epsiri.members[1] = WANDDER_NOACTION;      // TODO ?
+
     dec->emailcc.membercount = 3;
     ALLOC_MEMBERS(dec->emailcc);
     dec->emailcc.sequence =WANDDER_NOACTION;
@@ -4323,7 +5247,7 @@ static void init_dumpers(wandder_etsispec_t *dec) {
         };
     dec->asmtpaaainformation.sequence = WANDDER_NOACTION;
 
-    dec->iricontents.membercount = 16;
+    dec->iricontents.membercount = 20;
     ALLOC_MEMBERS(dec->iricontents);
     dec->iricontents.members[0] = WANDDER_NOACTION;
     dec->iricontents.members[1] =
@@ -4360,7 +5284,16 @@ static void init_dumpers(wandder_etsispec_t *dec) {
     dec->iricontents.members[12] = WANDDER_NOACTION;
     dec->iricontents.members[13] = WANDDER_NOACTION;
     dec->iricontents.members[14] = WANDDER_NOACTION;
-    dec->iricontents.members[15] = WANDDER_NOACTION;
+    dec->iricontents.members[15] =
+        (struct wandder_dump_action) {
+                .name = "ePSIRI",
+                .descend = &dec->epsiri,
+                .interpretas = WANDDER_TAG_NULL
+        };
+    dec->iricontents.members[16] = WANDDER_NOACTION;
+    dec->iricontents.members[17] = WANDDER_NOACTION;
+    dec->iricontents.members[18] = WANDDER_NOACTION;
+    dec->iricontents.members[19] = WANDDER_NOACTION;
     dec->iricontents.sequence = WANDDER_NOACTION;
 
 
@@ -4572,1884 +5505,6 @@ static void init_dumpers(wandder_etsispec_t *dec) {
                 .descend = &dec->payload,
                 .interpretas = WANDDER_TAG_NULL
         };
-}
-
-/////////////////////////////////start of BER code
-
-static inline void encode_ipaddress(wandder_encoder_ber_t* enc_ber, 
-        wandder_etsili_ipaddress_t *addr){
-
-    uint32_t addrlen = 4;
-    uint32_t iptype = addr->iptype;
-    uint32_t assign = addr->assignment;
-    uint32_t prefbits = addr->v6prefixlen;
-
-    if (addr->iptype == WANDDER_IPADDRESS_VERSION_6) {
-        addrlen = 16;
-    }
-
-    // iP-Type
-    wandder_encode_next_ber(enc_ber, WANDDER_TAG_ENUM,
-            WANDDER_CLASS_CONTEXT_PRIMITIVE, 1, (uint8_t*)&(iptype),
-            sizeof(iptype));
-
-    wandder_encode_next_ber(enc_ber, WANDDER_TAG_SEQUENCE,
-            WANDDER_CLASS_CONTEXT_CONSTRUCT, 2, NULL,
-            0);
-
-    if (addr->valtype == WANDDER_IPADDRESS_REP_BINARY) {
-        wandder_encode_next_ber(enc_ber, WANDDER_TAG_OCTETSTRING,
-            WANDDER_CLASS_CONTEXT_PRIMITIVE, 1, addr->ipvalue,
-            addrlen);
-    } else {
-        wandder_encode_next_ber(enc_ber, WANDDER_TAG_IA5,
-            WANDDER_CLASS_CONTEXT_PRIMITIVE, 2, addr->ipvalue,
-            strlen((char *)addr->ipvalue));
-    }
-
-    wandder_encode_endseq_ber(enc_ber, 1);
-
-    // iP-assignment
-    wandder_encode_next_ber(enc_ber, WANDDER_TAG_ENUM,
-            WANDDER_CLASS_CONTEXT_PRIMITIVE, 3, (uint8_t*)&(assign),
-            sizeof(assign));
-
-    // iPv6PrefixLength
-    if (addr->v6prefixlen > 0) {
-        wandder_encode_next_ber(enc_ber, WANDDER_TAG_INTEGER,
-            WANDDER_CLASS_CONTEXT_PRIMITIVE, 4, (uint8_t *)&(prefbits),
-            sizeof(prefbits));
-    }
-
-    // iPv4SubnetMask
-    if (addr->v4subnetmask > 0) {
-        wandder_encode_next_ber(enc_ber, WANDDER_TAG_OCTETSTRING,
-                WANDDER_CLASS_CONTEXT_PRIMITIVE, 5, 
-                (uint8_t *)&(addr->v4subnetmask),
-                sizeof(addr->v4subnetmask));
-    }
-
-    free(addr->ipvalue);
-}
-
-//ensures that the buffer exceeds child->body.buf + currlen in allocated memeroy
-//adjusts all internal pointers accordingly if realloc
-//returns the difference between new, and old buffers
-static ptrdiff_t check_body_size(wandder_etsili_child_t * child, size_t currlen){
-    
-    uint8_t* new;
-    ptrdiff_t offset = 0;
-
-    if (currlen + (child->body.data - child->buf) > child->alloc_len){
-        child->alloc_len = child->len + currlen + child->owner->increment_len;
-        child->body.alloc_len = child->alloc_len - child->header.len;
-        new = realloc(child->buf, child->alloc_len);
-        if (new == NULL){
-            //TODO handle realloc fail
-            fprintf(stderr, "unable to alloc mem\n");
-            assert(0);
-        }
-        
-        //update all refrences
-        if (new != child->body.buf){ //only need to update if alloc moved
-            ptrdiff_t offset = (new - child->buf);
-            child->buf          += offset;
-            child->header.buf   += offset;
-            child->header.cin   += offset;
-            child->header.seqno += offset;
-            child->header.sec   += offset;
-            child->header.usec  += offset;
-            child->header.end   += offset;
-
-            child->body.buf     += offset;
-            child->body.meta    += offset; 
-            child->body.data    += offset;
-            return offset;
-        }
-    }
-    return offset;
-}
-
-inline static void preencoded_here(uint8_t** ptr, ptrdiff_t * rem, int index, 
-        wandder_etsili_child_t * child) {
-
-    size_t ret = child->owner->preencoded[index]->len;
-    *ptr += check_body_size(child, (*ptr - child->body.buf) + ret);
-    memcpy(*ptr, 
-            child->owner->preencoded[index]->buf, ret);
-    *ptr += ret;
-    *rem = child->alloc_len - (*ptr - child->buf);
-}
-
-inline static void encode_here_ber_update(
-        uint8_t idnum, uint8_t class, uint8_t encodeas, 
-        void * valptr, size_t vallen, 
-        uint8_t** ptr, ptrdiff_t* rem,
-        wandder_etsili_child_t * child){
-
-    *ptr += check_body_size(child, (*ptr - child->body.buf) + 512);
-    size_t ret = encode_here_ber(
-                idnum,
-                class,
-                encodeas,
-                valptr, 
-                vallen,
-                *ptr,
-                *rem);
-    *ptr += ret;
-    *rem = child->alloc_len - (*ptr - child->buf);
-}
-
-static inline void encode_ipaddress_inplace(
-        uint8_t** ptr, ptrdiff_t* rem, wandder_etsili_child_t * child,
-        wandder_etsili_ipaddress_t *addr) {
-
-    uint32_t addrlen = 4;
-    uint32_t iptype = addr->iptype;
-    uint32_t assign = addr->assignment;
-    uint32_t prefbits = addr->v6prefixlen;
-
-    if (addr->iptype == WANDDER_IPADDRESS_VERSION_6) {
-        addrlen = 16;
-    }
-
-    // iP-Type
-    encode_here_ber_update(
-            1, WANDDER_CLASS_CONTEXT_PRIMITIVE, WANDDER_TAG_ENUM,
-            (uint8_t*)&(iptype), sizeof(iptype),
-            ptr, rem, child);
-
-    encode_here_ber_update(
-            2, WANDDER_CLASS_CONTEXT_CONSTRUCT, WANDDER_TAG_SEQUENCE,
-            NULL, 0,
-            ptr, rem, child);
-
-    if (addr->valtype == WANDDER_IPADDRESS_REP_BINARY) {
-        encode_here_ber_update(
-                1, WANDDER_CLASS_CONTEXT_PRIMITIVE, WANDDER_TAG_OCTETSTRING,
-                addr->ipvalue, addrlen,
-                ptr, rem, child);
-    } else {
-        encode_here_ber_update(
-                2, WANDDER_CLASS_CONTEXT_PRIMITIVE, WANDDER_TAG_IA5,
-                addr->ipvalue, strlen((char *)addr->ipvalue),
-                ptr, rem, child);
-    }
-
-    ENDCONSTRUCTEDBLOCK(*ptr, 1)
-    *rem -= 2;
-
-    // iP-assignment
-    encode_here_ber_update(
-            3, WANDDER_CLASS_CONTEXT_PRIMITIVE, WANDDER_TAG_ENUM,
-            (uint8_t*)&(assign), sizeof(assign),
-            ptr, rem, child);
-
-    // iPv6PrefixLength
-    if (addr->v6prefixlen > 0) {
-        encode_here_ber_update(
-                4, WANDDER_CLASS_CONTEXT_PRIMITIVE, WANDDER_TAG_INTEGER,
-                (uint8_t*)&(prefbits), sizeof(prefbits),
-                ptr, rem, child);
-    }
-
-    // iPv4SubnetMask
-    if (addr->v4subnetmask > 0) {
-        encode_here_ber_update(
-                5, WANDDER_CLASS_CONTEXT_PRIMITIVE, WANDDER_TAG_OCTETSTRING,
-                (uint8_t*)&(addr->v4subnetmask), sizeof(addr->v4subnetmask),
-                ptr, rem, child);
-    }
-    free(addr->ipvalue);
-}
-
-static void free_generic_body(wandder_generic_body_t * body) {
-
-    wandder_etsili_child_t * head = NULL;
-    wandder_etsili_child_t * next = NULL;
-
-    if (body->buf){
-        free(body->buf);
-    }
-
-    if (body->flist) {
-        //obtain lock and remove list from flist to prevent lock contention
-        // (could make the mutex recursive instead?)
-        if (pthread_mutex_lock(&(body->flist->mutex)) == 0){
-            head = body->flist->first;
-            body->flist->first = NULL;
-            body->flist->marked_for_delete = 1;
-            pthread_mutex_unlock(&(body->flist->mutex));
-        }
-        while (head){
-            next = head->nextfree;
-            wandder_free_child(head);
-            head = next;
-        }
-        free(body->flist);
-    }
-} 
-static void clear_preencoded_fields_ber( wandder_buf_t **pendarray ) {
-
-    wandder_preencode_index_t i;
-
-    for (i = 0; i < WANDDER_PREENCODE_LAST -1; i++) {
-        if (pendarray[i]) {
-            free(pendarray[i]->buf);
-            free(pendarray[i]);
-        }
-    }
-}
-
-void wandder_free_top(wandder_etsili_top_t *top){
-    
-    if(top){
-        if (top->preencoded){
-            clear_preencoded_fields_ber(top->preencoded);
-            free(top->preencoded);
-        }
-        if (top->header.buf)
-            free(top->header.buf);
-
-        free_generic_body(&top->ipcc);
-        free_generic_body(&top->ipmmcc);
-        free_generic_body(&top->ipiri);
-        free_generic_body(&top->ipmmiri);
-        free_generic_body(&top->umtscc);
-        free_generic_body(&top->umtsiri);
-
-        free(top);
-    }
-}
-
-static wandder_buf_t ** wandder_etsili_preencode_static_fields_ber(
-        wandder_etsili_intercept_details_t *details) {
-
-    int tvclass = 1;
-    uint32_t dirin = 0, dirout = 1, dirunk = 2;
-
-    wandder_buf_t **pendarray = calloc(sizeof(wandder_buf_t *),
-            WANDDER_PREENCODE_LAST);
-
-    pendarray[WANDDER_PREENCODE_USEQUENCE] = wandder_encode_new_ber(
-            WANDDER_CLASS_UNIVERSAL_CONSTRUCT, 
-            WANDDER_TAG_SEQUENCE,
-            WANDDER_TAG_SEQUENCE,
-            NULL, 
-            0);
-
-    pendarray[WANDDER_PREENCODE_CSEQUENCE_0] =  wandder_encode_new_ber(
-            WANDDER_CLASS_CONTEXT_CONSTRUCT, 
-            0,
-            WANDDER_TAG_SEQUENCE,
-            NULL, 
-            0);
-
-    pendarray[WANDDER_PREENCODE_CSEQUENCE_1] =  wandder_encode_new_ber(
-            WANDDER_CLASS_CONTEXT_CONSTRUCT, 
-            1,
-            WANDDER_TAG_SEQUENCE,
-            NULL, 
-            0);
-
-    pendarray[WANDDER_PREENCODE_CSEQUENCE_2] =  wandder_encode_new_ber(
-            WANDDER_CLASS_CONTEXT_CONSTRUCT, 
-            2,
-            WANDDER_TAG_SEQUENCE,
-            NULL, 
-            0);
-
-    pendarray[WANDDER_PREENCODE_CSEQUENCE_3] =  wandder_encode_new_ber(
-            WANDDER_CLASS_CONTEXT_CONSTRUCT, 
-            3,
-            WANDDER_TAG_SEQUENCE,
-            NULL, 
-            0);
-
-    pendarray[WANDDER_PREENCODE_CSEQUENCE_4] =  wandder_encode_new_ber(
-            WANDDER_CLASS_CONTEXT_CONSTRUCT, 
-            4,
-            WANDDER_TAG_SEQUENCE,
-            NULL, 
-            0);
-
-    pendarray[WANDDER_PREENCODE_CSEQUENCE_5] =  wandder_encode_new_ber(
-            WANDDER_CLASS_CONTEXT_CONSTRUCT, 
-            5,
-            WANDDER_TAG_SEQUENCE,
-            NULL, 
-            0);
-
-    pendarray[WANDDER_PREENCODE_CSEQUENCE_7] =  wandder_encode_new_ber(
-            WANDDER_CLASS_CONTEXT_CONSTRUCT, 
-            7,
-            WANDDER_TAG_SEQUENCE,
-            NULL, 
-            0);
-
-    pendarray[WANDDER_PREENCODE_CSEQUENCE_8] =  wandder_encode_new_ber(
-            WANDDER_CLASS_CONTEXT_CONSTRUCT, 
-            8,
-            WANDDER_TAG_SEQUENCE,
-            NULL, 
-            0);
-
-    pendarray[WANDDER_PREENCODE_CSEQUENCE_9] =  wandder_encode_new_ber(
-            WANDDER_CLASS_CONTEXT_CONSTRUCT, 
-            9,
-            WANDDER_TAG_SEQUENCE,
-            NULL, 
-            0);
-
-    pendarray[WANDDER_PREENCODE_CSEQUENCE_11] =  wandder_encode_new_ber(
-            WANDDER_CLASS_CONTEXT_CONSTRUCT, 
-            11,
-            WANDDER_TAG_SEQUENCE,
-            NULL, 
-            0);
-
-    pendarray[WANDDER_PREENCODE_CSEQUENCE_12] =  wandder_encode_new_ber(
-            WANDDER_CLASS_CONTEXT_CONSTRUCT, 
-            12,
-            WANDDER_TAG_SEQUENCE,
-            NULL, 
-            0);
-
-    pendarray[WANDDER_PREENCODE_CSEQUENCE_13] =  wandder_encode_new_ber(
-            WANDDER_CLASS_CONTEXT_CONSTRUCT, 
-            13,
-            WANDDER_TAG_SEQUENCE,
-            NULL, 
-            0);
-
-    pendarray[WANDDER_PREENCODE_CSEQUENCE_26] =  wandder_encode_new_ber(
-            WANDDER_CLASS_CONTEXT_CONSTRUCT, 
-            26,
-            WANDDER_TAG_SEQUENCE,
-            NULL, 
-            0);
-
-    //TODO i dont think this is 100% correct but i cant see anything wrong
-    pendarray[WANDDER_PREENCODE_PSDOMAINID] =  wandder_encode_new_ber( 
-            WANDDER_CLASS_CONTEXT_PRIMITIVE, 
-            0,
-            WANDDER_TAG_OID,
-            (uint8_t *)WANDDER_ETSILI_PSDOMAINID, 
-            sizeof WANDDER_ETSILI_PSDOMAINID);
-
-    pendarray[WANDDER_PREENCODE_LIID] =  wandder_encode_new_ber( 
-            WANDDER_CLASS_CONTEXT_PRIMITIVE, 
-            1,
-            WANDDER_TAG_OCTETSTRING,
-            (uint8_t *)details->liid, 
-            strlen(details->liid));
-
-    pendarray[WANDDER_PREENCODE_AUTHCC] =  wandder_encode_new_ber( 
-            WANDDER_CLASS_CONTEXT_PRIMITIVE, 
-            2,
-            WANDDER_TAG_OCTETSTRING,
-            (uint8_t *)details->authcc, 
-            strlen(details->authcc));
-
-    pendarray[WANDDER_PREENCODE_OPERATORID] =  wandder_encode_new_ber( 
-            WANDDER_CLASS_CONTEXT_PRIMITIVE, 
-            0,
-            WANDDER_TAG_OCTETSTRING,
-            (uint8_t *)details->operatorid, 
-            strlen(details->operatorid));
-
-    pendarray[WANDDER_PREENCODE_NETWORKELEMID] =  wandder_encode_new_ber( 
-            WANDDER_CLASS_CONTEXT_PRIMITIVE, 
-            1,
-            WANDDER_TAG_OCTETSTRING,
-            (uint8_t *)details->networkelemid, 
-            strlen(details->networkelemid));
-
-    pendarray[WANDDER_PREENCODE_DELIVCC] =  wandder_encode_new_ber( 
-            WANDDER_CLASS_CONTEXT_PRIMITIVE, 
-            2,
-            WANDDER_TAG_OCTETSTRING,
-            (uint8_t *)details->delivcc, 
-            strlen(details->delivcc));
-
-    //either build the field or set it NULL
-    pendarray[WANDDER_PREENCODE_INTPOINTID] = (details->intpointid) ? 
-            wandder_encode_new_ber( 
-                    WANDDER_CLASS_CONTEXT_PRIMITIVE,
-                    6,
-                    WANDDER_TAG_OCTETSTRING,
-                    (uint8_t *)details->intpointid,
-                    strlen(details->intpointid)) :
-            NULL;
-
-    pendarray[WANDDER_PREENCODE_TVCLASS] =  wandder_encode_new_ber( 
-            WANDDER_CLASS_CONTEXT_PRIMITIVE, 
-            8,
-            WANDDER_TAG_ENUM,
-            (uint8_t *)(&tvclass), 
-            sizeof tvclass);
-
-    pendarray[WANDDER_PREENCODE_IPMMIRIOID] =  wandder_encode_new_ber( 
-            WANDDER_CLASS_CONTEXT_PRIMITIVE, 
-            0,
-            WANDDER_TAG_RELATIVEOID,
-            etsi_ipmmirioid, 
-            sizeof etsi_ipmmirioid);
-
-    pendarray[WANDDER_PREENCODE_IPCCOID] =  wandder_encode_new_ber( 
-            WANDDER_CLASS_CONTEXT_PRIMITIVE, 
-            0,
-            WANDDER_TAG_RELATIVEOID,
-            etsi_ipccoid, 
-            sizeof etsi_ipccoid);
-
-    pendarray[WANDDER_PREENCODE_IPIRIOID] =  wandder_encode_new_ber( 
-            WANDDER_CLASS_CONTEXT_PRIMITIVE, 
-            0,
-            WANDDER_TAG_RELATIVEOID,
-            etsi_ipirioid, 
-            sizeof etsi_ipirioid);
-
-    pendarray[WANDDER_PREENCODE_UMTSIRIOID] =  wandder_encode_new_ber( 
-            WANDDER_CLASS_CONTEXT_PRIMITIVE, 
-            0,
-            WANDDER_TAG_OID,
-            etsi_umtsirioid, 
-            sizeof etsi_umtsirioid);
-
-    pendarray[WANDDER_PREENCODE_IPMMCCOID] =  wandder_encode_new_ber( 
-            WANDDER_CLASS_CONTEXT_PRIMITIVE, 
-            0,
-            WANDDER_TAG_RELATIVEOID,
-            etsi_ipmmccoid, 
-            sizeof etsi_ipmmccoid);
-
-    pendarray[WANDDER_PREENCODE_DIRFROM] =  wandder_encode_new_ber( 
-            WANDDER_CLASS_CONTEXT_PRIMITIVE, 
-            0,
-            WANDDER_TAG_ENUM,
-            (uint8_t *)(&dirin), 
-            sizeof dirin);
-
-    pendarray[WANDDER_PREENCODE_DIRTO] =  wandder_encode_new_ber( 
-            WANDDER_CLASS_CONTEXT_PRIMITIVE, 
-            0,
-            WANDDER_TAG_ENUM,
-            (uint8_t *)(&dirout), 
-            sizeof dirout);
-
-    pendarray[WANDDER_PREENCODE_DIRUNKNOWN] =  wandder_encode_new_ber( 
-            WANDDER_CLASS_CONTEXT_PRIMITIVE, 
-            0,
-            WANDDER_TAG_ENUM,
-            (uint8_t *)(&dirunk), 
-            sizeof dirunk);
-    pendarray[WANDDER_PREENCODE_LIID_LEN] = (void *)((size_t)strlen(details->liid));
-
-    return pendarray;
-
-}
-
-static int sort_etsili_generic(
-        wandder_etsili_generic_t *a, 
-        wandder_etsili_generic_t *b) {
-
-    if (a->itemnum < b->itemnum) {
-        return -1;
-    }
-    if (a->itemnum > b->itemnum) {
-        return 1;
-    }
-    return 0;
-}
-
-static uint8_t* wandder_encode_body_data_ber(
-        wandder_etsili_child_t* child,
-        uint8_t class, 
-        uint8_t idnum, 
-        uint8_t encodeas, 
-        uint8_t * valptr,
-        size_t vallen){
-
-    ptrdiff_t currlen = calculate_length(idnum, class, encodeas, vallen); 
-    
-    //if new length cannot fit in old space make more
-    // if currlen+(currptr-baseptr) > alloclen
-    check_body_size(child, currlen);
-
-    ptrdiff_t rem = child->alloc_len - (child->body.data - child->buf);
-
-    size_t ret = encode_here_ber(idnum, class, encodeas, valptr, vallen, 
-            child->body.data, rem);
-
-    return ret + child->body.data;
-}
-
-static void update_etsili_pshdr_pc(wandder_pshdr_t * header, int64_t cin,
-        int64_t seqno, struct timeval* tv){
-
-    ber_rebuild_integer(
-            WANDDER_CLASS_CONTEXT_PRIMITIVE, 
-            1, 
-            &(cin), 
-            sizeof cin,
-            header->cin);
-
-    ber_rebuild_integer(
-            WANDDER_CLASS_CONTEXT_PRIMITIVE, 
-            4, 
-            &(seqno), 
-            sizeof seqno,
-            header->seqno);
-
-    ber_rebuild_integer(
-            WANDDER_CLASS_CONTEXT_PRIMITIVE, 
-            0, 
-            &(tv->tv_sec), 
-            sizeof tv->tv_sec,
-            header->sec);
-
-    ber_rebuild_integer(
-            WANDDER_CLASS_CONTEXT_PRIMITIVE, 
-            1, 
-            &(tv->tv_usec), 
-            sizeof tv->tv_usec,
-            header->usec);
-}
-
-static void init_etsili_pshdr_pc(wandder_encoder_ber_t* enc_ber, 
-        wandder_etsili_top_t* top) {
-
-    int64_t cin = 0;
-    int64_t seqno = 0;
-    struct timeval tv = {0,0};
-
-    wandder_append_preencoded_ber(enc_ber, 
-            top->preencoded[WANDDER_PREENCODE_USEQUENCE]);
-    wandder_append_preencoded_ber(enc_ber, 
-            top->preencoded[WANDDER_PREENCODE_CSEQUENCE_1]);
-    wandder_append_preencoded_ber(enc_ber, 
-            top->preencoded[WANDDER_PREENCODE_PSDOMAINID]);
-    wandder_append_preencoded_ber(enc_ber, 
-            top->preencoded[WANDDER_PREENCODE_LIID]);
-    wandder_append_preencoded_ber(enc_ber, 
-            top->preencoded[WANDDER_PREENCODE_AUTHCC]);
-    wandder_append_preencoded_ber(enc_ber, 
-            top->preencoded[WANDDER_PREENCODE_CSEQUENCE_3]);
-    wandder_append_preencoded_ber(enc_ber, 
-            top->preencoded[WANDDER_PREENCODE_CSEQUENCE_0]);
-    wandder_append_preencoded_ber(enc_ber, 
-            top->preencoded[WANDDER_PREENCODE_OPERATORID]);
-    wandder_append_preencoded_ber(enc_ber, 
-            top->preencoded[WANDDER_PREENCODE_NETWORKELEMID]);
-    wandder_encode_endseq_ber(enc_ber, 1);
-
-    ptrdiff_t cin_diff = enc_ber->ptr - enc_ber->buf;
-    wandder_encode_next_ber(enc_ber, WANDDER_TAG_INTEGER,
-            WANDDER_CLASS_CONTEXT_PRIMITIVE, 1, &(cin),
-            sizeof cin);
-
-    wandder_append_preencoded_ber(enc_ber, 
-            top->preencoded[WANDDER_PREENCODE_DELIVCC]);
-    wandder_encode_endseq_ber(enc_ber, 1);
-
-    ptrdiff_t seqno_diff = enc_ber->ptr - enc_ber->buf;
-    wandder_encode_next_ber(enc_ber, WANDDER_TAG_INTEGER,
-            WANDDER_CLASS_CONTEXT_PRIMITIVE, 4, &(seqno),
-            sizeof seqno);
-
-    if (top->preencoded[WANDDER_PREENCODE_INTPOINTID]) {
-        wandder_append_preencoded_ber(enc_ber, 
-                top->preencoded[WANDDER_PREENCODE_INTPOINTID]);
-    }
-    wandder_append_preencoded_ber(enc_ber, 
-            top->preencoded[WANDDER_PREENCODE_CSEQUENCE_7]);
-
-    ptrdiff_t sec_diff = enc_ber->ptr - enc_ber->buf;
-    wandder_encode_next_ber(enc_ber, WANDDER_TAG_INTEGER,
-            WANDDER_CLASS_CONTEXT_PRIMITIVE, 0, &(tv.tv_sec),
-            sizeof tv.tv_sec);
-
-    ptrdiff_t usec_diff = enc_ber->ptr - enc_ber->buf;
-    wandder_encode_next_ber(enc_ber, WANDDER_TAG_INTEGER,
-            WANDDER_CLASS_CONTEXT_PRIMITIVE, 1, &(tv.tv_usec),
-            sizeof tv.tv_usec);
-
-    wandder_encode_endseq_ber(enc_ber, 1);
-
-    wandder_append_preencoded_ber(enc_ber, 
-            top->preencoded[WANDDER_PREENCODE_TVCLASS]);
-    wandder_encode_endseq_ber(enc_ber, 1);
-    ptrdiff_t end_diff = enc_ber->ptr - enc_ber->buf;
-
-
-    wandder_encoded_result_ber_t* res_ber = wandder_encode_finish_ber(enc_ber);
-
-    top->header.buf             = res_ber->buf;
-    top->header.len             = res_ber->len;
-    top->header.cin             = res_ber->buf + cin_diff;
-    top->header.seqno           = res_ber->buf + seqno_diff;
-    top->header.sec             = res_ber->buf + sec_diff;
-    top->header.usec            = res_ber->buf + usec_diff;
-    top->header.end             = res_ber->buf + end_diff;
-
-    free(res_ber);
-}
-
-static void update_etsili_ipcc(
-        void* ipcontents, size_t iplen, uint8_t dir, 
-        wandder_etsili_child_t * child) {
-    if (dir == 0) {
-        memcpy(child->body.meta, 
-                child->owner->preencoded[WANDDER_PREENCODE_DIRFROM]->buf, 
-                child->owner->preencoded[WANDDER_PREENCODE_DIRFROM]->len);
-    } else if (dir == 1) {
-        memcpy(child->body.meta, 
-                child->owner->preencoded[WANDDER_PREENCODE_DIRTO]->buf, 
-                child->owner->preencoded[WANDDER_PREENCODE_DIRTO]->len);
-    } else if (dir == 2) {
-        memcpy(child->body.meta, 
-                child->owner->preencoded[WANDDER_PREENCODE_DIRUNKNOWN]->buf, 
-                child->owner->preencoded[WANDDER_PREENCODE_DIRUNKNOWN]->len);
-    } else {
-        ber_rebuild_integer(
-            WANDDER_CLASS_CONTEXT_PRIMITIVE, 
-            0, 
-            &(dir), 
-            sizeof dir,
-            child->body.meta);
-    }
-
-    uint8_t* ptr = wandder_encode_body_data_ber(
-            child,
-            WANDDER_CLASS_CONTEXT_PRIMITIVE, 
-            0,
-            WANDDER_TAG_IPPACKET,
-            ipcontents, 
-            iplen);
-
-    ptr += check_body_size(child, (ptr - child->body.buf) + (7*2));
-    ENDCONSTRUCTEDBLOCK(ptr,7)
-    child->body.len = ptr - child->body.buf;
-    child->len = ptr - child->buf;
-
-}
-
-static void update_etsili_ipmmcc(
-        void* ipcontents, size_t iplen, uint8_t dir, 
-        wandder_etsili_child_t * child) {
-
-    uint32_t frametype = 0; //TODO these are hard coded to 0? 
-    uint32_t mmccproto = 0; //at least they are in etsili_core.c in OpenLI
-
-    if (dir == 0) {
-        memcpy(child->body.meta, 
-                child->owner->preencoded[WANDDER_PREENCODE_DIRFROM]->buf, 
-                child->owner->preencoded[WANDDER_PREENCODE_DIRFROM]->len);
-    } else if (dir == 1) {
-        memcpy(child->body.meta, 
-                child->owner->preencoded[WANDDER_PREENCODE_DIRTO]->buf, 
-                child->owner->preencoded[WANDDER_PREENCODE_DIRTO]->len);
-    } else if (dir == 2) {
-        memcpy(child->body.meta, 
-                child->owner->preencoded[WANDDER_PREENCODE_DIRUNKNOWN]->buf, 
-                child->owner->preencoded[WANDDER_PREENCODE_DIRUNKNOWN]->len);
-    } else {
-        ber_rebuild_integer(
-            WANDDER_CLASS_CONTEXT_PRIMITIVE, 
-            0, 
-            &(dir), 
-            sizeof dir,
-            child->body.meta);
-    }
-
-    uint8_t* ptr = wandder_encode_body_data_ber(
-            child,
-            WANDDER_CLASS_CONTEXT_PRIMITIVE, 
-            1,
-            WANDDER_TAG_IPPACKET,
-            ipcontents, 
-            iplen);
-
-    //ensure there is enough space for the last section
-    ptr += check_body_size(child, (ptr - child->body.buf) +
-            (6*2) + (child->owner->preencoded[WANDDER_PREENCODE_DIRUNKNOWN]->len *2));
-
-    ptr += ber_rebuild_integer(
-            WANDDER_CLASS_CONTEXT_PRIMITIVE, 
-            2, 
-            &(frametype), 
-            sizeof frametype,
-            ptr);
-
-    ptr += ber_rebuild_integer(
-            WANDDER_CLASS_CONTEXT_PRIMITIVE, 
-            4, 
-            &(mmccproto), 
-            sizeof mmccproto,
-            ptr);
-    
-    ENDCONSTRUCTEDBLOCK(ptr,6) //endseq
-    child->body.len = ptr - child->body.buf;
-    child->len = ptr - child->buf;
-}
-
-static void update_etsili_ipmmiri(
-        void* ipcontents, size_t iplen, wandder_etsili_iri_type_t iritype, 
-        wandder_etsili_child_t * child) {
-
-    ber_rebuild_integer(
-            WANDDER_CLASS_CONTEXT_PRIMITIVE, 
-            0, 
-            &(iritype), 
-            sizeof iritype,
-            child->body.meta);
-
-    uint8_t* ptr = wandder_encode_body_data_ber(
-            child,
-            WANDDER_CLASS_CONTEXT_PRIMITIVE, 
-            2,
-            WANDDER_TAG_IPPACKET,
-            ipcontents, 
-            iplen);
-
-    //ensure there is enough space for the last section
-    ptr += check_body_size(child, (ptr - child->body.buf) + (8*2));
-    ENDCONSTRUCTEDBLOCK(ptr,8)
-    child->body.len = ptr - child->body.buf;
-    child->len = ptr - child->buf;
-}
-
-static void update_etsili_ipiri(
-        wandder_etsili_generic_t *params, wandder_etsili_iri_type_t iritype, 
-        wandder_etsili_child_t * child) {
-
-    wandder_etsili_generic_t *p, *tmp;
-    wandder_ipiri_id_t* iriid;
-    size_t ret;
-    uint8_t * ptr = child->body.data;
-    ptrdiff_t data_ptr_diff = ptr - child->buf;
-    ptrdiff_t rem = child->alloc_len - (ptr - child->buf);
-    
-    ber_rebuild_integer(
-            WANDDER_CLASS_CONTEXT_PRIMITIVE, 
-            0, 
-            &(iritype), 
-            sizeof iritype,
-            child->body.meta);
-
-    //do params here from
-    HASH_SRT(hh, params, sort_etsili_generic);
-    HASH_ITER(hh, params, p, tmp) {
-        ptr += check_body_size(child, (ptr - child->body.buf) + 512);
-        rem = child->alloc_len - (ptr - child->buf);
-        //need a better way then just making it bigger before hand (maybe?)
-        switch(p->itemnum) {
-            case WANDDER_IPIRI_CONTENTS_ACCESS_EVENT_TYPE:
-            case WANDDER_IPIRI_CONTENTS_INTERNET_ACCESS_TYPE:
-            case WANDDER_IPIRI_CONTENTS_IPVERSION:
-            case WANDDER_IPIRI_CONTENTS_ENDREASON:
-            case WANDDER_IPIRI_CONTENTS_AUTHENTICATION_TYPE:
-                ret = encode_here_ber(
-                        p->itemnum,
-                        WANDDER_CLASS_CONTEXT_PRIMITIVE,
-                        WANDDER_TAG_ENUM,
-                        p->itemptr,
-                        p->itemlen, 
-                        ptr, rem);
-                ptr += ret;
-                rem -= ret;
-                break;
-
-            case WANDDER_IPIRI_CONTENTS_TARGET_USERNAME:
-            case WANDDER_IPIRI_CONTENTS_RAW_AAA_DATA:
-                ret = encode_here_ber(
-                        p->itemnum,
-                        WANDDER_CLASS_CONTEXT_PRIMITIVE,
-                        WANDDER_TAG_OCTETSTRING,
-                        p->itemptr,
-                        p->itemlen, 
-                        ptr, rem);
-                ptr += ret;
-                rem -= ret;
-                break;
-
-            case WANDDER_IPIRI_CONTENTS_TARGET_IPADDRESS:
-            case WANDDER_IPIRI_CONTENTS_POP_IPADDRESS:
-            case WANDDER_IPIRI_CONTENTS_ADDITIONAL_IPADDRESS:
-                encode_here_ber_update(
-                        p->itemnum, WANDDER_CLASS_CONTEXT_CONSTRUCT, WANDDER_TAG_SEQUENCE,
-                        NULL, 0,
-                        &ptr, &rem, child);
-                encode_ipaddress_inplace(
-                        &ptr, 
-                        &rem, 
-                        child, 
-                        (wandder_etsili_ipaddress_t *)(p->itemptr));
-                ENDCONSTRUCTEDBLOCK(ptr,1)
-                break;
-
-            case WANDDER_IPIRI_CONTENTS_POP_IDENTIFIER:
-                iriid = (wandder_ipiri_id_t *)p->itemptr;
-                ret = encode_here_ber(
-                        p->itemnum,
-                        WANDDER_CLASS_CONTEXT_CONSTRUCT,
-                        WANDDER_TAG_SEQUENCE,
-                        NULL,
-                        0, 
-                        ptr, rem);
-                ptr += ret;
-                rem -= ret;
-                if (iriid->type == WANDDER_IPIRI_ID_PRINTABLE) {
-                    ret = encode_here_ber(
-                            0,
-                            WANDDER_CLASS_CONTEXT_PRIMITIVE,
-                            WANDDER_TAG_UTF8STR,
-                            (uint8_t *)iriid->content.printable,
-                            strlen(iriid->content.printable),
-                            ptr, rem);
-                    ptr += ret;
-                    rem -= ret;
-                } else if (iriid->type == WANDDER_IPIRI_ID_MAC) {
-                    ret = encode_here_ber(
-                            1,
-                            WANDDER_CLASS_CONTEXT_PRIMITIVE,
-                            WANDDER_TAG_OCTETSTRING,
-                            iriid->content.mac,
-                            6,
-                            ptr, rem);
-                    ptr += ret;
-                    rem -= ret;
-                } else if (iriid->type == WANDDER_IPIRI_ID_IPADDR) {
-                    ret = encode_here_ber(
-                            2,
-                            WANDDER_CLASS_CONTEXT_CONSTRUCT,
-                            WANDDER_TAG_SEQUENCE,
-                            NULL,
-                            0,
-                            ptr, rem);
-                    ptr += ret;
-                    rem -= ret;
-                    //encode_ipaddress(enc_ber, iriid->content.ip);
-                    ENDCONSTRUCTEDBLOCK(ptr, 1)
-                }
-                ENDCONSTRUCTEDBLOCK(ptr, 1)
-                break;
-
-            case WANDDER_IPIRI_CONTENTS_NATIONAL_IPIRI_PARAMETERS:
-                /* TODO NationalIPIRIParameters */
-                break;
-
-            case WANDDER_IPIRI_CONTENTS_OTHER_TARGET_IDENTIFIERS:
-                /* TODO */
-                break;
-
-            case WANDDER_IPIRI_CONTENTS_POP_PORTNUMBER:
-            case WANDDER_IPIRI_CONTENTS_OCTETS_RECEIVED:
-            case WANDDER_IPIRI_CONTENTS_OCTETS_TRANSMITTED:
-                ret = encode_here_ber(
-                        p->itemnum,
-                        WANDDER_CLASS_CONTEXT_PRIMITIVE,
-                        WANDDER_TAG_INTEGER,
-                        p->itemptr,
-                        p->itemlen,
-                        ptr, rem);
-                ptr += ret;
-                rem -= ret;
-                break;
-
-            case WANDDER_IPIRI_CONTENTS_STARTTIME:
-            case WANDDER_IPIRI_CONTENTS_ENDTIME:
-            case WANDDER_IPIRI_CONTENTS_EXPECTED_ENDTIME:
-                if (p->itemlen != sizeof(struct timeval)) {
-                    break;
-                }
-                ret = encode_here_ber(
-                            p->itemnum,
-                            WANDDER_CLASS_CONTEXT_PRIMITIVE,
-                            WANDDER_TAG_GENERALTIME,
-                            p->itemptr,
-                            p->itemlen,
-                            ptr, rem);
-                ptr += ret;
-                rem -= ret;
-                break;
-
-            case WANDDER_IPIRI_CONTENTS_TARGET_NETWORKID:
-            case WANDDER_IPIRI_CONTENTS_TARGET_CPEID:
-            case WANDDER_IPIRI_CONTENTS_TARGET_LOCATION:
-            case WANDDER_IPIRI_CONTENTS_CALLBACK_NUMBER:
-            case WANDDER_IPIRI_CONTENTS_POP_PHONENUMBER:
-                /* TODO enforce max string lens */
-                ret = encode_here_ber(
-                            p->itemnum,
-                            WANDDER_CLASS_CONTEXT_PRIMITIVE,
-                            WANDDER_TAG_UTF8STR,
-                            p->itemptr,
-                            p->itemlen,
-                            ptr, rem);
-                ptr += ret;
-                rem -= ret;
-                break;
-        }
-    }
-
-    //ensure there is enough space for the last section
-    child->body.data = data_ptr_diff + child->buf;
-    ptr += check_body_size(child, (ptr - child->body.buf) + (8*2));
-    ENDCONSTRUCTEDBLOCK(ptr,7) //endseq
-    child->body.len = ptr - child->body.buf;
-    child->len = ptr - child->buf;
-
-}
-
-static void update_etsili_umtscc(
-        void* ipcontents, size_t iplen, uint8_t dir, 
-        wandder_etsili_child_t * child) {
-    if (dir == 0) {
-        memcpy(child->body.meta, 
-                child->owner->preencoded[WANDDER_PREENCODE_DIRFROM]->buf, 
-                child->owner->preencoded[WANDDER_PREENCODE_DIRFROM]->len);
-    } else if (dir == 1) {
-        memcpy(child->body.meta, 
-                child->owner->preencoded[WANDDER_PREENCODE_DIRTO]->buf, 
-                child->owner->preencoded[WANDDER_PREENCODE_DIRTO]->len);
-    } else if (dir == 2) {
-        memcpy(child->body.meta, 
-                child->owner->preencoded[WANDDER_PREENCODE_DIRUNKNOWN]->buf, 
-                child->owner->preencoded[WANDDER_PREENCODE_DIRUNKNOWN]->len);
-    } else {
-        ber_rebuild_integer(
-            WANDDER_CLASS_CONTEXT_PRIMITIVE, 
-            0, 
-            &(dir), 
-            sizeof dir,
-            child->body.meta);
-    }
-
-    uint8_t* ptr = wandder_encode_body_data_ber(
-            child,
-            WANDDER_CLASS_CONTEXT_PRIMITIVE, 
-            4,
-            WANDDER_TAG_IPPACKET,
-            ipcontents, 
-            iplen);
-
-    ptr += check_body_size(child, (ptr - child->body.buf) + (5*2));
-    ENDCONSTRUCTEDBLOCK(ptr,5)
-    child->body.len = ptr - child->body.buf;
-    child->len = ptr - child->buf;
-
-}
-
-static void update_etsili_umtsiri(
-        wandder_etsili_generic_t *params, wandder_etsili_iri_type_t iritype, 
-        wandder_etsili_child_t * child) {
-
-    wandder_etsili_generic_t *p, *savedtime;
-    size_t ret;
-    uint8_t lookup;
-    uint32_t iriversion = 8;
-    uint32_t gprstarget = 3;
-    uint8_t * ptr = child->body.meta; //start from meta,
-    ptrdiff_t data_ptr_diff = ptr - child->buf;
-    ptrdiff_t rem;
-    
-    ptr += check_body_size(child, (ptr - child->body.buf) + 512);
-    ret = ber_rebuild_integer(
-            WANDDER_CLASS_CONTEXT_PRIMITIVE, 
-            0, 
-            &(iritype), 
-            sizeof iritype,
-            child->body.meta);
-    ptr += ret;
-    rem = child->alloc_len - (ptr - child->buf);
-    
-/* timeStamp -- as generalized time */
-    lookup = WANDDER_UMTSIRI_CONTENTS_EVENT_TIME;
-    HASH_FIND(hh, params, &lookup, sizeof(lookup), p);
-    if (p) {
-        encode_here_ber_update(
-                1, WANDDER_CLASS_CONTEXT_PRIMITIVE, WANDDER_TAG_GENERALTIME,
-                p->itemptr, p->itemlen,
-                &ptr, &rem, child);
-        savedtime = p;
-    } else {
-        savedtime = NULL;
-        fprintf(stderr,
-                "wandder: warning, no timestamp available for constructing UMTS IRI\n");
-        fprintf(stderr, "wandder: UMTS IRI record may be invalid...\n");
-    }
-    preencoded_here(&ptr, &rem, WANDDER_PREENCODE_CSEQUENCE_2, child);
-    preencoded_here(&ptr, &rem, WANDDER_PREENCODE_CSEQUENCE_4, child);
-    preencoded_here(&ptr, &rem, WANDDER_PREENCODE_CSEQUENCE_0, child);
-
-    /* IRI-Parameters start here */
-
-    /* Object identifier (0) */
-    preencoded_here(&ptr, &rem, WANDDER_PREENCODE_UMTSIRIOID, child);
-
-    /* LIID (1) -- fortunately the identifier matches the one
-     * used in the PSHeader, so we can use our preencoded
-     * version */
-
-    preencoded_here(&ptr, &rem, WANDDER_PREENCODE_LIID, child);    
-
-    /* timeStamp again (3) -- different format, use UTCTime */
-    preencoded_here(&ptr, &rem, WANDDER_PREENCODE_CSEQUENCE_3, child);
-
-    if (savedtime) {
-        encode_here_ber_update(
-                1, WANDDER_CLASS_CONTEXT_PRIMITIVE, WANDDER_TAG_UTCTIME,
-                savedtime->itemptr, savedtime->itemlen,
-                &ptr, &rem, child);
-    }
-    ENDCONSTRUCTEDBLOCK(ptr, 1)
-
-    /* initiator (4) */
-    lookup = WANDDER_UMTSIRI_CONTENTS_INITIATOR;
-    HASH_FIND(hh, params, &lookup, sizeof(lookup), p);
-    if (!p) {
-        fprintf(stderr, "wandder: warning, no initiator available for constructing UMTS IRI\n");
-        fprintf(stderr, "wandder: UMTS IRI record may be invalid...\n");
-    } else {
-        encode_here_ber_update(
-                4, WANDDER_CLASS_CONTEXT_PRIMITIVE, WANDDER_TAG_ENUM,
-                p->itemptr, p->itemlen,
-                &ptr, &rem, child);
-    }
-
-    /* location, if available (8) -- nested */
-    preencoded_here(&ptr, &rem, WANDDER_PREENCODE_CSEQUENCE_8, child);
-
-    lookup = WANDDER_UMTSIRI_CONTENTS_CGI;
-    HASH_FIND(hh, params, &lookup, sizeof(lookup), p);
-    if (p) {
-        encode_here_ber_update(
-                2, WANDDER_CLASS_CONTEXT_PRIMITIVE, WANDDER_TAG_OCTETSTRING,
-                p->itemptr, p->itemlen,
-                &ptr, &rem, child);
-    }
-
-    lookup = WANDDER_UMTSIRI_CONTENTS_SAI;
-    HASH_FIND(hh, params, &lookup, sizeof(lookup), p);
-    if (p) {
-        encode_here_ber_update(
-                7, WANDDER_CLASS_CONTEXT_PRIMITIVE, WANDDER_TAG_OCTETSTRING,
-                p->itemptr, p->itemlen,
-                &ptr, &rem, child);
-    }
-
-    lookup = WANDDER_UMTSIRI_CONTENTS_TAI;
-    HASH_FIND(hh, params, &lookup, sizeof(lookup), p);
-    if (p) {
-        encode_here_ber_update(
-                9, WANDDER_CLASS_CONTEXT_PRIMITIVE, WANDDER_TAG_OCTETSTRING,
-                p->itemptr, p->itemlen,
-                &ptr, &rem, child);
-    }
-
-    lookup = WANDDER_UMTSIRI_CONTENTS_ECGI;
-    HASH_FIND(hh, params, &lookup, sizeof(lookup), p);
-    if (p) {
-        rem -= ret;
-        encode_here_ber_update(
-                10, WANDDER_CLASS_CONTEXT_PRIMITIVE, WANDDER_TAG_OCTETSTRING,
-                p->itemptr, p->itemlen,
-                &ptr, &rem, child);
-    }
-
-    preencoded_here(&ptr, &rem, WANDDER_PREENCODE_CSEQUENCE_13, child);
-    preencoded_here(&ptr, &rem, WANDDER_PREENCODE_CSEQUENCE_0, child);
-
-    lookup = WANDDER_UMTSIRI_CONTENTS_LOCATION_TIME;
-    HASH_FIND(hh, params, &lookup, sizeof(lookup), p);
-    if (p) {
-        encode_here_ber_update(
-                0, WANDDER_CLASS_CONTEXT_PRIMITIVE, WANDDER_TAG_UTCTIME,
-                p->itemptr, p->itemlen,
-                &ptr, &rem, child);
-    }
-    ENDCONSTRUCTEDBLOCK(ptr,3)
-
-    /* party information (9) -- nested */
-    preencoded_here(&ptr, &rem, WANDDER_PREENCODE_CSEQUENCE_9, child);
-
-    encode_here_ber_update(
-                0, WANDDER_CLASS_CONTEXT_PRIMITIVE, WANDDER_TAG_ENUM,
-                &gprstarget, sizeof(gprstarget),
-                &ptr, &rem, child);
-
-    preencoded_here(&ptr, &rem, WANDDER_PREENCODE_CSEQUENCE_1, child);
-
-    lookup = WANDDER_UMTSIRI_CONTENTS_IMEI;
-    HASH_FIND(hh, params, &lookup, sizeof(lookup), p);
-    if (p) {
-        encode_here_ber_update(
-                1, WANDDER_CLASS_CONTEXT_PRIMITIVE, WANDDER_TAG_OCTETSTRING,
-                p->itemptr, p->itemlen,
-                &ptr, &rem, child);
-    } else {
-        fprintf(stderr, "wandder: warning, no IMEI available for constructing UMTS IRI\n");
-        fprintf(stderr, "wandder: UMTS IRI record may be invalid...\n");
-    }
-
-    lookup = WANDDER_UMTSIRI_CONTENTS_IMSI;
-    HASH_FIND(hh, params, &lookup, sizeof(lookup), p);
-    if (p) {
-        encode_here_ber_update(
-                3, WANDDER_CLASS_CONTEXT_PRIMITIVE, WANDDER_TAG_OCTETSTRING,
-                p->itemptr, p->itemlen,
-                &ptr, &rem, child);
-    } else {
-        fprintf(stderr, "wandder: warning, no IMSI available for constructing UMTS IRI\n");
-        fprintf(stderr, "wandder: UMTS IRI record may be invalid...\n");
-    }
-
-    lookup = WANDDER_UMTSIRI_CONTENTS_MSISDN;
-    HASH_FIND(hh, params, &lookup, sizeof(lookup), p);
-    if (p) {
-        encode_here_ber_update(
-                6, WANDDER_CLASS_CONTEXT_PRIMITIVE, WANDDER_TAG_OCTETSTRING,
-                p->itemptr, p->itemlen,
-                &ptr, &rem, child);
-    } else {
-        fprintf(stderr, "wandder: warning, no MSISDN available for constructing UMTS IRI\n");
-        fprintf(stderr, "wandder: UMTS IRI record may be invalid...\n");
-    }
-
-    ENDCONSTRUCTEDBLOCK(ptr,1)
-
-    /* servicesDataInformation (pdpAddress, APN etc) */
-    preencoded_here(&ptr, &rem, WANDDER_PREENCODE_CSEQUENCE_4, child);       // services-data-information
-    preencoded_here(&ptr, &rem, WANDDER_PREENCODE_CSEQUENCE_1, child);       // gprs-parameters
-
-    lookup = WANDDER_UMTSIRI_CONTENTS_PDP_ADDRESS;
-    HASH_FIND(hh, params, &lookup, sizeof(lookup), p);
-    if (p) {
-        preencoded_here(&ptr, &rem, WANDDER_PREENCODE_CSEQUENCE_1, child);       // pdp-address
-        preencoded_here(&ptr, &rem, WANDDER_PREENCODE_CSEQUENCE_1, child);       // datanodeaddress
-        encode_ipaddress_inplace(&ptr, &rem, child, (wandder_etsili_ipaddress_t *)(p->itemptr));
-        ENDCONSTRUCTEDBLOCK(ptr,2)
-    } else {
-        fprintf(stderr, "wandder: warning, no PDP Address available for constructing UMTS IRI\n");
-        fprintf(stderr, "wandder: UMTS IRI record may be invalid...\n");
-    }
-
-    /* TODO figure out if we need to include the "length" field in our
-     * encoding.
-     */
-    lookup = WANDDER_UMTSIRI_CONTENTS_APNAME;
-    HASH_FIND(hh, params, &lookup, sizeof(lookup), p);
-    if (p) {
-        encode_here_ber_update(
-                2, WANDDER_CLASS_CONTEXT_PRIMITIVE, WANDDER_TAG_OCTETSTRING,
-                p->itemptr, p->itemlen,
-                &ptr, &rem, child);
-    }
-
-    lookup = WANDDER_UMTSIRI_CONTENTS_PDPTYPE;
-    HASH_FIND(hh, params, &lookup, sizeof(lookup), p);
-    if (p) {
-        encode_here_ber_update(
-                3, WANDDER_CLASS_CONTEXT_PRIMITIVE, WANDDER_TAG_OCTETSTRING,
-                p->itemptr, p->itemlen,
-                &ptr, &rem, child);
-    }
-
-    ENDCONSTRUCTEDBLOCK(ptr,3)
-
-    /* gprs correlation number (18) */
-    lookup = WANDDER_UMTSIRI_CONTENTS_GPRS_CORRELATION;
-    HASH_FIND(hh, params, &lookup, sizeof(lookup), p);
-    if (!p) {
-        fprintf(stderr, "wandder: warning, no GPRS correlation number available for constructing UMTS IRI\n");
-        fprintf(stderr, "wandder: UMTS IRI record may be invalid...\n");
-    } else {
-        char space[24];
-        snprintf(space, 24, "%lu", *((long *)(p->itemptr)));
-
-        encode_here_ber_update(
-                18, WANDDER_CLASS_CONTEXT_PRIMITIVE, WANDDER_TAG_OCTETSTRING,
-                space, strlen(space),
-                &ptr, &rem, child);
-    }
-
-    /* gprs event (20) */
-    lookup = WANDDER_UMTSIRI_CONTENTS_EVENT_TYPE;
-    HASH_FIND(hh, params, &lookup, sizeof(lookup), p);
-    if (!p) {
-        fprintf(stderr, "wandder: warning, no GPRS event type available for constructing UMTS IRI\n");
-        fprintf(stderr, "wandder: UMTS IRI record may be invalid...\n");
-    } else {
-        encode_here_ber_update(
-                20, WANDDER_CLASS_CONTEXT_PRIMITIVE, WANDDER_TAG_ENUM,
-                p->itemptr, p->itemlen,
-                &ptr, &rem, child);
-    }
-
-
-    /* gprs operation error code (22)  -- optional */
-    lookup = WANDDER_UMTSIRI_CONTENTS_GPRS_ERROR_CODE;
-    HASH_FIND(hh, params, &lookup, sizeof(lookup), p);
-    if (p) {
-        encode_here_ber_update(
-                22, WANDDER_CLASS_CONTEXT_PRIMITIVE, WANDDER_TAG_OCTETSTRING,
-                p->itemptr, p->itemlen,
-                &ptr, &rem, child);
-    }
-
-    /* IRI version (23) */
-    encode_here_ber_update(
-                23, WANDDER_CLASS_CONTEXT_PRIMITIVE, WANDDER_TAG_ENUM,
-                &iriversion, sizeof(iriversion),
-                &ptr, &rem, child);
-
-    /* networkIdentifier (26) -- nested */
-    preencoded_here(&ptr, &rem, WANDDER_PREENCODE_CSEQUENCE_26, child);
-
-    lookup = WANDDER_UMTSIRI_CONTENTS_OPERATOR_IDENTIFIER;
-    HASH_FIND(hh, params, &lookup, sizeof(lookup), p);
-    if (p) {
-        encode_here_ber_update(
-                0, WANDDER_CLASS_CONTEXT_PRIMITIVE, WANDDER_TAG_OCTETSTRING,
-                p->itemptr, p->itemlen,
-                &ptr, &rem, child);
-    } else {
-        fprintf(stderr, "wandder: warning, no operator identifier available for constructing UMTS IRI\n");
-        fprintf(stderr, "wandder: UMTS IRI record may be invalid...\n");
-    }
-
-    lookup = WANDDER_UMTSIRI_CONTENTS_GGSN_IPADDRESS;
-
-    HASH_FIND(hh, params, &lookup, sizeof(lookup), p);
-    if (p) {
-        preencoded_here(&ptr, &rem, WANDDER_PREENCODE_CSEQUENCE_1, child);
-        preencoded_here(&ptr, &rem, WANDDER_PREENCODE_CSEQUENCE_5, child);
-        encode_ipaddress_inplace(&ptr, &rem, child, (wandder_etsili_ipaddress_t *)(p->itemptr));
-        ENDCONSTRUCTEDBLOCK(ptr,2)
-    } else {
-        fprintf(stderr, "wandder: warning, no network element identifier available for constructing UMTS IRI\n");
-        fprintf(stderr, "wandder: UMTS IRI record may be invalid...\n");
-    }
-
-    //ensure there is enough space for the last section
-    child->body.data = data_ptr_diff + child->buf;
-    ptr += check_body_size(child, (ptr - child->body.buf) + (8*2));
-    ENDCONSTRUCTEDBLOCK(ptr,8) //endseq
-    child->body.len = ptr - child->body.buf;
-    child->len = ptr - child->buf;
-
-}
-
-void wandder_init_etsili_umtsiri(
-        wandder_encoder_ber_t* enc_ber,
-        wandder_etsili_top_t* top) {
-
-    wandder_encoded_result_ber_t* res_ber;
-
-    if (!top || !top->preencoded || !enc_ber){
-        fprintf(stderr,"Make sure wandder_encode_init_top_ber is called first\n");
-        return;
-    }
-    
-    wandder_append_preencoded_ber(enc_ber, 
-            top->preencoded[WANDDER_PREENCODE_CSEQUENCE_2]);
-    wandder_append_preencoded_ber(enc_ber, 
-            top->preencoded[WANDDER_PREENCODE_CSEQUENCE_0]);
-    wandder_append_preencoded_ber(enc_ber, 
-            top->preencoded[WANDDER_PREENCODE_USEQUENCE]);
-
-    ptrdiff_t iri_diff = enc_ber->ptr - enc_ber->buf;
-
-    // most of UMTSIRI is regenerated, so no point continuing to
-    // populate areas that might be over written
-    ptrdiff_t params_diff = enc_ber->ptr - enc_ber->buf;
-
-    res_ber = wandder_encode_finish_ber(enc_ber);
-
-    top->umtsiri.buf              = res_ber->buf;
-    top->umtsiri.len              = res_ber->len;
-    top->umtsiri.alloc_len        = res_ber->len;
-    top->umtsiri.meta             = res_ber->buf + iri_diff;
-    top->umtsiri.data             = res_ber->buf + params_diff;
-
-    free(res_ber);
-
-}
-
-wandder_etsili_child_t *wandder_etsili_create_child(wandder_etsili_top_t* top, 
-        wandder_generic_body_t * body) {
-
-    ptrdiff_t diff;
-    wandder_etsili_child_t * child;
-
-    //ensure top and body exist
-    if ( !(top) || !(top->header.buf) ) {
-        fprintf(stderr,
-            "Make sure wandder_encode_init_top_ber have been called first\n");
-        return NULL;
-    }
-    if (!body->buf) {
-        fprintf(stderr,
-            "Make sure wandder_init_etsili_??? have been called first\n");
-        return NULL;
-    }
-    
-    child = malloc(sizeof(wandder_etsili_child_t));
-    child->len = top->header.len + body->len;
-    child->buf = malloc(child->len);
-    child->alloc_len = child->len;
-
-    child->owner = top;
-    child->flist = body->flist;
-    if (child->flist) {
-        if (pthread_mutex_lock(&(child->flist->mutex)) == 0) {
-            child->flist->counter++;
-        pthread_mutex_unlock(&(child->flist->mutex));
-        }
-    }
-
-    child->header.buf = child->buf;
-    child->header.len = top->header.len;
-
-    memcpy(child->header.buf, top->header.buf, top->header.len);
-
-    diff = child->header.buf - top->header.buf;
-    child->header.cin   = diff + top->header.cin;
-    child->header.seqno = diff + top->header.seqno;
-    child->header.sec   = diff + top->header.sec;
-    child->header.usec  = diff + top->header.usec;
-    child->header.end   = diff + top->header.end;
-
-
-    //TODO potential to make header/body into one buffer 
-    ///as header size is const
-    child->body.buf = child->header.buf + child->header.len; 
-
-    child->body.alloc_len = body->len; 
-    //this length is the alloc from the start of the body
-
-    memcpy(child->body.buf, body->buf, body->len);
-    child->body.len = body->len;
-
-    diff = child->body.buf - body->buf;
-    child->body.meta = diff + body->meta;
-    child->body.data = diff + body->data;
-
-    return child;
-
-}
-
-void wandder_free_child(wandder_etsili_child_t * child){
-
-    if (child) {
-        if (child->flist){
-            if (pthread_mutex_lock(&(child->flist->mutex)) == 0) {
-                if (child->flist->marked_for_delete == 0){
-                    //release and return
-                    child->nextfree = child->flist->first;
-                    child->flist->first = child;
-
-                    pthread_mutex_unlock(&(child->flist->mutex));
-                    return;
-                }
-
-                child->flist->counter--;
-                
-                if (child->flist->counter == 0){
-                    //we are the sole owner so we can free it
-                    pthread_mutex_destroy(&(child->flist->mutex));
-                    free(child->flist);
-                } else {
-                    pthread_mutex_unlock(&(child->flist->mutex));
-                }
-            }
-        }
-
-        if (child->buf)
-            free(child->buf);
-        
-        free(child);
-    }
-}
-
-void wandder_init_etsili_ipmmcc(
-        wandder_encoder_ber_t* enc_ber,
-        wandder_etsili_top_t* top) {
-
-    uint32_t frametype = 0;
-    uint32_t mmccproto = 0;
-
-    wandder_encoded_result_ber_t* res_ber;
-
-    if (!top || !top->preencoded || !enc_ber){
-        fprintf(stderr,"Make sure wandder_encode_init_top_ber is called first\n");
-        return;
-    }
-    
-    wandder_append_preencoded_ber(enc_ber, 
-            top->preencoded[WANDDER_PREENCODE_CSEQUENCE_2]);
-    wandder_append_preencoded_ber(enc_ber, 
-            top->preencoded[WANDDER_PREENCODE_CSEQUENCE_1]);
-    wandder_append_preencoded_ber(enc_ber, 
-            top->preencoded[WANDDER_PREENCODE_USEQUENCE]);
-
-    ptrdiff_t dir_diff = enc_ber->ptr - enc_ber->buf;
-
-    wandder_append_preencoded_ber(enc_ber, 
-            top->preencoded[WANDDER_PREENCODE_DIRFROM]);
-
-
-    wandder_append_preencoded_ber(enc_ber, 
-            top->preencoded[WANDDER_PREENCODE_CSEQUENCE_2]);
-    wandder_append_preencoded_ber(enc_ber, 
-            top->preencoded[WANDDER_PREENCODE_CSEQUENCE_12]);
-    wandder_append_preencoded_ber(enc_ber, 
-            top->preencoded[WANDDER_PREENCODE_IPMMCCOID]);
-
-    ptrdiff_t ipcontent_diff = enc_ber->ptr - enc_ber->buf;
-    wandder_encode_next_ber(enc_ber, WANDDER_TAG_IPPACKET,
-            WANDDER_CLASS_CONTEXT_PRIMITIVE, 1, NULL, 0);
-
-    wandder_encode_next_ber(enc_ber, WANDDER_TAG_ENUM,
-                WANDDER_CLASS_CONTEXT_PRIMITIVE, 2, &frametype,
-                sizeof frametype);
-
-    wandder_encode_next_ber(enc_ber, WANDDER_TAG_ENUM,
-                WANDDER_CLASS_CONTEXT_PRIMITIVE, 4, &mmccproto,
-                sizeof mmccproto);
-
-    wandder_encode_endseq_ber(enc_ber, 6);
-
-    res_ber = wandder_encode_finish_ber(enc_ber);
-
-    top->ipmmcc.buf                 = res_ber->buf;
-    top->ipmmcc.len                 = res_ber->len;
-    top->ipmmcc.alloc_len           = res_ber->len;
-    top->ipmmcc.meta                = res_ber->buf + dir_diff;
-    top->ipmmcc.data                = res_ber->buf + ipcontent_diff;
-
-    free(res_ber);
-
-    return;
-}
-
-void wandder_init_etsili_ipmmiri(
-        wandder_encoder_ber_t* enc_ber,
-        wandder_etsili_top_t* top) {
-
-    wandder_encoded_result_ber_t* res_ber;
-    uint32_t source_ip = 0;
-    uint32_t dest_ip = 0;
-    uint8_t *ipsrc = (uint8_t*)&source_ip;
-    uint8_t *ipdest = (uint8_t*)&dest_ip;
-    wandder_etsili_iri_type_t iritype = 0;
-
-    if (!top || !top->preencoded || !enc_ber){
-        fprintf(stderr,"Make sure wandder_encode_init_top_ber is called first\n");
-        return;
-    }
-
-    wandder_etsili_ipaddress_t encipsrc, encipdst;
-   
-    encipsrc.iptype = WANDDER_IPADDRESS_VERSION_4;
-    encipsrc.assignment = WANDDER_IPADDRESS_ASSIGNED_UNKNOWN;
-    encipsrc.v6prefixlen = 0;
-    encipsrc.v4subnetmask = 0xffffffff;
-    encipsrc.valtype = WANDDER_IPADDRESS_REP_BINARY;
-    encipsrc.ipvalue = malloc(sizeof(uint32_t));
-    memcpy(encipsrc.ipvalue, &ipsrc, sizeof(uint32_t));
-
-    encipdst = encipsrc;
-    encipdst.ipvalue = malloc(sizeof(uint32_t));
-    memcpy(encipdst.ipvalue, &ipdest, sizeof(uint32_t));
-
-    wandder_append_preencoded_ber(enc_ber, 
-            top->preencoded[WANDDER_PREENCODE_CSEQUENCE_2]);
-    wandder_append_preencoded_ber(enc_ber, 
-            top->preencoded[WANDDER_PREENCODE_CSEQUENCE_0]);
-    wandder_append_preencoded_ber(enc_ber, 
-            top->preencoded[WANDDER_PREENCODE_USEQUENCE]);
-
-    ptrdiff_t iri_diff = enc_ber->ptr - enc_ber->buf;
-    wandder_encode_next_ber(enc_ber, WANDDER_TAG_ENUM,
-            WANDDER_CLASS_CONTEXT_PRIMITIVE, 0, &iritype,
-            sizeof iritype);
-
-    wandder_append_preencoded_ber(enc_ber, 
-            top->preencoded[WANDDER_PREENCODE_CSEQUENCE_2]);
-    wandder_append_preencoded_ber(enc_ber, 
-            top->preencoded[WANDDER_PREENCODE_CSEQUENCE_11]);
-    wandder_append_preencoded_ber(enc_ber, 
-            top->preencoded[WANDDER_PREENCODE_IPMMIRIOID]);
-    wandder_append_preencoded_ber(enc_ber, 
-            top->preencoded[WANDDER_PREENCODE_CSEQUENCE_1]);
-    wandder_append_preencoded_ber(enc_ber, 
-            top->preencoded[WANDDER_PREENCODE_CSEQUENCE_1]);
-    wandder_append_preencoded_ber(enc_ber, 
-            top->preencoded[WANDDER_PREENCODE_CSEQUENCE_0]);
-    
-    //encode ip address encipsrc
-    encode_ipaddress(enc_ber, &encipsrc);
-    wandder_encode_endseq_ber(enc_ber, 1);
-
-    wandder_append_preencoded_ber(enc_ber, 
-            top->preencoded[WANDDER_PREENCODE_CSEQUENCE_1]);
-
-    //encode ip address encipdst
-    encode_ipaddress(enc_ber, &encipdst);
-    wandder_encode_endseq_ber(enc_ber, 1);
-
-    ptrdiff_t ipcontent_diff = enc_ber->ptr - enc_ber->buf;
-    wandder_encode_next_ber(enc_ber, WANDDER_TAG_IPPACKET,
-            WANDDER_CLASS_CONTEXT_PRIMITIVE, 2, NULL, 0);
-
-
-    wandder_encode_endseq_ber(enc_ber, 8);
-
-    res_ber = wandder_encode_finish_ber(enc_ber);
-
-    top->ipmmiri.buf               = res_ber->buf;
-    top->ipmmiri.len               = res_ber->len;
-    top->ipmmiri.alloc_len         = res_ber->len;
-    top->ipmmiri.meta              = res_ber->buf + iri_diff;
-    top->ipmmiri.data              = res_ber->buf + ipcontent_diff;
-
-    free(res_ber);
-
-    return;
-}
-
-void wandder_init_etsili_ipcc(
-        wandder_encoder_ber_t* enc_ber,
-        wandder_etsili_top_t* top) {
-
-    if (!top || !top->preencoded || !enc_ber){
-        fprintf(stderr,"Make sure wandder_encode_init_top_ber is called first\n");
-        return;
-    }
-
-    wandder_encoded_result_ber_t* res_ber;
-    
-    wandder_append_preencoded_ber(enc_ber, 
-            top->preencoded[WANDDER_PREENCODE_CSEQUENCE_2]);
-    wandder_append_preencoded_ber(enc_ber, 
-            top->preencoded[WANDDER_PREENCODE_CSEQUENCE_1]);
-    wandder_append_preencoded_ber(enc_ber, 
-            top->preencoded[WANDDER_PREENCODE_USEQUENCE]);
-
-    ptrdiff_t dir_diff = enc_ber->ptr - enc_ber->buf;
-    wandder_append_preencoded_ber(enc_ber, 
-            top->preencoded[WANDDER_PREENCODE_DIRFROM]);
-
-
-    wandder_append_preencoded_ber(enc_ber, 
-            top->preencoded[WANDDER_PREENCODE_CSEQUENCE_2]);
-    wandder_append_preencoded_ber(enc_ber, 
-            top->preencoded[WANDDER_PREENCODE_CSEQUENCE_2]);
-    wandder_append_preencoded_ber(enc_ber, 
-            top->preencoded[WANDDER_PREENCODE_IPCCOID]);
-    wandder_append_preencoded_ber(enc_ber, 
-            top->preencoded[WANDDER_PREENCODE_CSEQUENCE_1]);
-
-    ptrdiff_t ipcontent_diff = enc_ber->ptr - enc_ber->buf;
-    wandder_encode_next_ber(enc_ber, WANDDER_TAG_IPPACKET,
-            WANDDER_CLASS_CONTEXT_PRIMITIVE, 0, NULL, 0);
-
-    wandder_encode_endseq_ber(enc_ber, 7);
-
-    res_ber = wandder_encode_finish_ber(enc_ber);
-
-    top->ipcc.buf               = res_ber->buf;
-    top->ipcc.len               = res_ber->len;
-    top->ipcc.alloc_len         = res_ber->len;
-    top->ipcc.meta              = res_ber->buf + dir_diff;
-    top->ipcc.data              = res_ber->buf + ipcontent_diff;
-
-    free(res_ber);
-
-    return;
-}
-
-void wandder_init_etsili_ipiri(
-        wandder_encoder_ber_t* enc_ber,
-        wandder_etsili_top_t* top) {
-
-    wandder_encoded_result_ber_t* res_ber;
-    wandder_etsili_iri_type_t iritype = 0;
-
-    if (!top || !top->preencoded || !enc_ber){
-        fprintf(stderr,"Make sure wandder_encode_init_top_ber is called first\n");
-        return;
-    }
-
-    //////////////////////////////////////////////////////////////// block 0
-    wandder_append_preencoded_ber(enc_ber, 
-            top->preencoded[WANDDER_PREENCODE_CSEQUENCE_2]);
-    wandder_append_preencoded_ber(enc_ber, 
-            top->preencoded[WANDDER_PREENCODE_CSEQUENCE_0]);
-    wandder_append_preencoded_ber(enc_ber, 
-            top->preencoded[WANDDER_PREENCODE_USEQUENCE]);
-    //////////////////////////////////////////////////////////////// dir
-
-    ptrdiff_t iri_diff = enc_ber->ptr - enc_ber->buf;
-    wandder_encode_next_ber(enc_ber, WANDDER_TAG_ENUM,
-                WANDDER_CLASS_CONTEXT_PRIMITIVE, 0, &iritype,
-                sizeof (iritype));
-
-    //////////////////////////////////////////////////////////////// block 1
-    wandder_append_preencoded_ber(enc_ber, 
-            top->preencoded[WANDDER_PREENCODE_CSEQUENCE_2]);
-    wandder_append_preencoded_ber(enc_ber, 
-            top->preencoded[WANDDER_PREENCODE_CSEQUENCE_2]);
-    wandder_append_preencoded_ber(enc_ber, 
-            top->preencoded[WANDDER_PREENCODE_IPIRIOID]);
-    wandder_append_preencoded_ber(enc_ber, 
-            top->preencoded[WANDDER_PREENCODE_CSEQUENCE_1]);
-    //////////////////////////////////////////////////////////////// ipcontents
-    ptrdiff_t params_diff = enc_ber->ptr - enc_ber->buf;
-    wandder_encode_endseq_ber(enc_ber, 7); //endseq
-
-    res_ber = wandder_encode_finish_ber(enc_ber);
-
-    top->ipiri.buf              = res_ber->buf;
-    top->ipiri.len              = res_ber->len;
-    top->ipiri.alloc_len        = res_ber->len;
-    top->ipiri.meta             = res_ber->buf + iri_diff;
-    top->ipiri.data             = res_ber->buf + params_diff;
-
-    free(res_ber);
-
-    return;
-}
-
-void wandder_init_etsili_umtscc(
-        wandder_encoder_ber_t* enc_ber,
-        wandder_etsili_top_t* top) {
-
-    if (!top || !top->preencoded || !enc_ber){
-        fprintf(stderr,"Make sure wandder_encode_init_top_ber is called first\n");
-        return;
-    }
-
-    wandder_encoded_result_ber_t* res_ber;
-    
-    wandder_append_preencoded_ber(enc_ber, 
-            top->preencoded[WANDDER_PREENCODE_CSEQUENCE_2]);
-    wandder_append_preencoded_ber(enc_ber, 
-            top->preencoded[WANDDER_PREENCODE_CSEQUENCE_1]);
-    wandder_append_preencoded_ber(enc_ber, 
-            top->preencoded[WANDDER_PREENCODE_USEQUENCE]);
-
-    ptrdiff_t dir_diff = enc_ber->ptr - enc_ber->buf;
-    wandder_append_preencoded_ber(enc_ber, 
-            top->preencoded[WANDDER_PREENCODE_DIRFROM]);
-
-
-    wandder_append_preencoded_ber(enc_ber, 
-            top->preencoded[WANDDER_PREENCODE_CSEQUENCE_2]);
-    
-    ptrdiff_t ipcontent_diff = enc_ber->ptr - enc_ber->buf;
-    wandder_encode_next_ber(enc_ber, WANDDER_TAG_IPPACKET,
-            WANDDER_CLASS_CONTEXT_PRIMITIVE, 4, NULL, 0);
-
-    wandder_encode_endseq_ber(enc_ber, 5);
-
-    res_ber = wandder_encode_finish_ber(enc_ber);
-
-    top->umtscc.buf               = res_ber->buf;
-    top->umtscc.len               = res_ber->len;
-    top->umtscc.alloc_len         = res_ber->len;
-    top->umtscc.meta              = res_ber->buf + dir_diff;
-    top->umtscc.data              = res_ber->buf + ipcontent_diff;
-
-    free(res_ber);
-
-    return;
-}
-
-void wandder_encode_etsi_ipmmcc_ber (
-        int64_t cin, int64_t seqno,
-        struct timeval* tv, void* ipcontents, size_t iplen, uint8_t dir,
-        wandder_etsili_child_t * child) {
-    
-    if (!child || !child->header.buf) {
-        //error out for not initlizing top first
-        fprintf(stderr,"Make sure wandder_encode_init_top_ber is called first\n");
-        return;
-    }
-    if (!child->body.buf) {
-        //error out for not initlizing ipmmcc
-        fprintf(stderr,"Call init ipmmcc first.\n");
-        return;
-    }
-
-    update_etsili_pshdr_pc(&child->header, cin, seqno, tv);
-    update_etsili_ipmmcc(ipcontents, iplen, dir, child);
-
-}
-
-void wandder_encode_etsi_ipmmiri_ber (
-        int64_t cin, int64_t seqno,
-        struct timeval* tv, void* ipcontents, size_t iplen, 
-        wandder_etsili_iri_type_t iritype,
-        uint8_t *ipsrc, uint8_t *ipdest, int ipfamily,
-        wandder_etsili_child_t * child) {
-
-
-    if (!child || !child->header.buf) {
-        //error out for not initlizing top first
-        fprintf(stderr,"Make sure wandder_encode_init_top_ber is called first\n");
-        return;
-    }
-    if (!child->body.buf) {
-        //error out for not initlizing ipmmiri
-        fprintf(stderr,"Call init ipmmiri first.\n");
-        return;
-    }
-
-    update_etsili_pshdr_pc(&child->header, cin, seqno, tv);
-    update_etsili_ipmmiri(ipcontents, iplen, iritype, child);
-
-}
-
-void wandder_encode_etsi_ipcc_ber (
-        int64_t cin, int64_t seqno,
-        struct timeval* tv, void* ipcontents, size_t iplen, uint8_t dir,
-        wandder_etsili_child_t * child) {
-
-    if (!child || !child->header.buf) {
-        //error out for not initlizing top first
-        fprintf(stderr,"Make sure wandder_encode_init_top_ber is called first\n");
-        return;
-    }
-    if (!child->body.buf) {
-        //error out for not initlizing ipcc
-        fprintf(stderr,"Call init ipcc first.\n");
-        return;
-    }
-    
-    update_etsili_pshdr_pc(&child->header, cin, seqno, tv);
-    update_etsili_ipcc(ipcontents, iplen, dir, child);
-
-}
-
-void wandder_encode_etsi_ipiri_ber (
-        int64_t cin, int64_t seqno,
-        struct timeval* tv, void* params, wandder_etsili_iri_type_t iritype,
-        wandder_etsili_child_t * child) {
-    
-    if (!child || !child->header.buf) {
-        //error out for not initlizing top first
-        fprintf(stderr,"Make sure wandder_encode_init_top_ber is called first\n");
-        return;
-    }
-    if (!child->body.buf) {
-        //error out for not initlizing ipiri
-        fprintf(stderr,"Call init ipiri first.\n");
-        return;
-    }
-
-    update_etsili_pshdr_pc(&child->header, cin, seqno, tv);
-    update_etsili_ipiri(params, iritype, child);
-
-}
-
-void wandder_encode_etsi_umtsiri_ber(
-        int64_t cin, int64_t seqno,
-        struct timeval* tv, void* params, wandder_etsili_iri_type_t iritype,
-        wandder_etsili_child_t * child) {
-    
-    if (!child || !child->header.buf) {
-        //error out for not initlizing top first
-        fprintf(stderr,"Make sure wandder_encode_init_top_ber is called first\n");
-        return;
-    }
-    if (!child->body.buf) {
-        //error out for not initlizing umtsiri
-        fprintf(stderr,"Call init umtsiri first.\n");
-        return;
-    }
-
-    update_etsili_pshdr_pc(&child->header, cin, seqno, tv);
-    update_etsili_umtsiri(params, iritype, child);
-}
-
-void wandder_encode_etsi_umtscc_ber (
-        int64_t cin, int64_t seqno,
-        struct timeval* tv, void* ipcontents, size_t iplen, uint8_t dir,
-        wandder_etsili_child_t * child) {
-
-    if (!child || !child->header.buf) {
-        //error out for not initlizing top first
-        fprintf(stderr,"Make sure wandder_encode_init_top_ber is called first\n");
-        return;
-    }
-    if (!child->body.buf) {
-        //error out for not initlizing umtscc
-        fprintf(stderr,"Call init umtscc first.\n");
-        return;
-    }
-    
-    update_etsili_pshdr_pc(&child->header, cin, seqno, tv);
-    update_etsili_umtscc(ipcontents, iplen, dir, child);
-
-}
-
-wandder_etsili_top_t* wandder_encode_init_top_ber (wandder_encoder_ber_t* enc_ber, 
-        wandder_etsili_intercept_details_t* intdetails) {
-
-    wandder_etsili_top_t* top = calloc(sizeof(wandder_etsili_top_t), 1);
-
-    top->preencoded =  wandder_etsili_preencode_static_fields_ber(intdetails);
-
-    init_etsili_pshdr_pc(enc_ber, top);
-
-    top->increment_len = enc_ber->increment;
-
-    return top;
-}
-
-wandder_etsili_child_freelist_t *wandder_create_etsili_child_freelist() {
-    wandder_etsili_child_freelist_t *flist;
-
-    pthread_mutexattr_t attr;
-
-    flist = (wandder_etsili_child_freelist_t *)calloc(1,
-            sizeof(wandder_etsili_child_freelist_t));
-
-    //setting recursive as lock operations happen across a linked list
-    pthread_mutexattr_init(&attr);
-    pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE);
-    pthread_mutex_init(&(flist->mutex), &attr);
-    flist->first = NULL;
-    return flist;
-}
-
-wandder_etsili_child_t *wandder_create_etsili_child(
-        wandder_etsili_top_t* top, 
-        wandder_generic_body_t * body) {
-
-    wandder_etsili_child_t *child = NULL;
-
-    //only need to actually create child if none exist here
-
-    if (pthread_mutex_trylock(&(body->flist->mutex)) == 0) {
-        //if you cant obtain mutex just make a new child, no need to wait
-        if (body->flist->first) {
-            child = body->flist->first;
-            body->flist->first = child->nextfree;
-        }
-
-        pthread_mutex_unlock(&(body->flist->mutex));
-    }
-
-    if (child == NULL) {
-        child = wandder_etsili_create_child(top, body);
-    }
-
-    return child;
 }
 
 // vim: set sw=4 tabstop=4 softtabstop=4 expandtab :
