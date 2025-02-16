@@ -1,11 +1,11 @@
 /*
  *
- * Copyright (c) 2017-2019 The University of Waikato, Hamilton, New Zealand.
+ * Copyright (c) 2024, 2025 SearchLight Ltd, New Zealand.
  * All rights reserved.
  *
  * This file is part of libwandder.
  *
- * This code has been developed by the University of Waikato WAND
+ * Libwandder was originally developed by the University of Waikato WAND
  * research group. For further information please see http://www.wand.net.nz/
  *
  * libwandder is free software; you can redistribute it and/or modify
@@ -380,6 +380,9 @@ enum {
     WANDDER_ETSILI_CC_FORMAT_UNKNOWN = 0,
     WANDDER_ETSILI_CC_FORMAT_IP = 1,
     WANDDER_ETSILI_CC_FORMAT_APPLICATION = 2,
+    WANDDER_ETSILI_CC_FORMAT_TCP = 3,
+    WANDDER_ETSILI_CC_FORMAT_UDP = 4,
+    WANDDER_ETSILI_CC_FORMAT_RTP = 5,
 };
 
 wandder_etsispec_t *wandder_create_etsili_decoder(void);
