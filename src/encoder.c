@@ -57,17 +57,6 @@ wandder_encoder_t *init_wandder_encoder(void) {
     return enc;
 }
 
-static inline void free_single_pending(wandder_pend_t **freelist,
-        wandder_pend_t *p) {
-
-    p->lastchild = NULL;
-    p->siblings = NULL;
-    p->parent = NULL;
-    p->children = NULL;
-    p->nextfree = *freelist;
-    *freelist = p;
-}
-
 void reset_wandder_encoder(wandder_encoder_t *enc) {
 
     if (enc->quickfree_tail) {
@@ -728,12 +717,13 @@ static inline uint32_t encode_pending(wandder_pend_t *p, uint8_t **buf,
     uint32_t ret;
     uint32_t tot = 0;
 
-/*
+    /*
     printf("pending: %u %u %u %u  %u %u %u (%u)\n", p->thisjob.identclass,
             p->thisjob.identifier, p->thisjob.encodeas,
             p->thisjob.preamblen, p->childrensize, p->thisjob.vallen,
             p->thisjob.encodedlen, *rem);
-*/
+    assert(*rem < 4294967243);
+    */
 
     if (p->thisjob.identclass == WANDDER_CLASS_ALREADY_ENCODED) {
         goto savevalue;
